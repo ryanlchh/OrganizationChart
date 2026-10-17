@@ -43,12 +43,13 @@ CSV / `ORG_DATA` rows:
 | `treePriority` | Yes; Optional | `0` is the leftmost tree, then `1`, then `2`. A blank cell inherits the smallest number anywhere in that same tree. A mix such as `0` and `1` is not an error: the tree uses `0` and sits before trees numbered `1` or `2`. A tree with no numbers is placed after the numbered trees, in CSV order |
 | `location` | Yes, every person | One of the values in `alias.json` `locationKeys`. The key is the flag file name in `assets` without `.svg` |
 | `importance` | Column required; value may be blank | `Y` shows an asterisk before the name |
+| `branch` | Optional column; value may be blank | Hiring-company alias from `alias.json` `branchKeys`. A mix is several aliases joined by `/`, such as `HK1/HK2`. A blank cell leaves the card white |
 
-`data.js` always uses those canonical field names. Market CSV headers can differ. `alias.json` `columnKeys` supplies the real header for each field. Column order does not matter.
+`data.js` always uses those canonical field names. Market CSV headers can differ. `alias.json` `columnKeys` supplies the real header for each field. Column order does not matter. Omit `columnKeys.branch` when the file has no hiring-alias column.
 
 ## Alias file
 
-Edit `alias.json` only. `columnKeys` maps fields to CSV headers. `locationKeys` maps a flag file name (no `.svg`) to the location text stored on each person.
+Edit `alias.json` only. `columnKeys` maps fields to CSV headers. `locationKeys` maps a flag file name (no `.svg`) to the location text stored on each person. `branchKeys` maps an internal name to the hiring-alias text stored in the optional `branch` column. `hexColorKeys` lists card colors in the same order as `branchKeys`: the first branch uses the first color, the second branch the second color, and so on.
 
 ```json
 {
@@ -59,7 +60,8 @@ Edit `alias.json` only. `columnKeys` maps fields to CSV headers. `locationKeys` 
     "parentId": "parentId",
     "treePriority": "tree_priority",
     "location": "location",
-    "importance": "importance"
+    "importance": "importance",
+    "branch": "branch"
   },
   "locationKeys": {
     "hk": "HK",
@@ -68,11 +70,24 @@ Edit `alias.json` only. `columnKeys` maps fields to CSV headers. `locationKeys` 
     "pl": "Poland",
     "gb": "UK",
     "us": "US"
+  },
+  "branchKeys": {
+    "branch1": "HK1",
+    "branch2": "HK2",
+    "branch3": "UK1"
+  },
+  "hexColorKeys": {
+    "color1": "#FF7F7F",
+    "color2": "#98FB98",
+    "color3": "#87CEFA",
+    "color4": "#D8BFD8"
   }
 }
 ```
 
 Then open `prepare.html`, choose the CSV, and download a new `data.js`. If a mapped header is not in the file, the page stops and names the missing column. Conflicting priority numbers do not stop the download.
+
+When `columnKeys.branch` is set, prepare also checks that column. Each non-blank cell is split on `/`. Every part must be a `branchKeys` value. The number of colors in `hexColorKeys` must be greater than the number of distinct branches in the file. Three branches and three colors fails; three branches and four colors passes. People with a branch are filled with those colors: one alias is a solid color, two aliases split the card in half, three aliases take about a third each.
 
 ## How users open the chart
 

@@ -38,6 +38,7 @@
           treePriority: String(d.treePriority != null ? d.treePriority : (d.tree_priority || "")).trim(),
           location: String(d.location || "").trim(),
           importance: String(d.importance || "").trim(),
+          branch: String(d.branch || "").trim(),
         };
       });
   }
@@ -155,6 +156,29 @@
     }[ch]));
   }
 
+  function branchFill(value) {
+    const tokens = String(value || "")
+      .split("/")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (!tokens.length) return "#fff";
+    const branches = Object.values((window.ALIAS && window.ALIAS.branchKeys) || {});
+    const colors = Object.values((window.ALIAS && window.ALIAS.hexColorKeys) || {});
+    const picked = [];
+    for (const token of tokens) {
+      const index = branches.indexOf(token);
+      if (index < 0 || !colors[index]) return "#fff";
+      picked.push(colors[index]);
+    }
+    if (picked.length === 1) return picked[0];
+    const stops = picked.map((color, index) => {
+      const start = (100 * index) / picked.length;
+      const end = (100 * (index + 1)) / picked.length;
+      return color + " " + start + "% " + end + "%";
+    });
+    return "linear-gradient(to right, " + stops.join(", ") + ")";
+  }
+
   function flagFile(location) {
     const map = (window.ALIAS && window.ALIAS.locationKeys) || {};
     const match = Object.entries(map).find(([, label]) => label === location);
@@ -171,6 +195,7 @@
     const shortTitle = title.length > 26 ? `${title.slice(0, 24)}…` : title;
     const important = String(d.data.importance || "").trim().toUpperCase() === "Y";
     const flag = flagFile(d.data.location);
+    const cardFill = branchFill(d.data.branch);
     const mark = important
       ? `<span title="Important" style="flex:0 0 auto;margin-right:4px;color:#7ec8e3;font-weight:700;line-height:1;">*</span>`
       : "";
@@ -182,7 +207,7 @@
         width:${d.width}px;
         height:${d.height}px;
         padding:8px 10px 8px 8px;
-        background:#fff;
+        background:${cardFill};
         border:2px solid #cbd5e1;
         border-radius:8px;
         display:flex;
@@ -415,6 +440,7 @@
       treePriority: "tree_priority",
       location: "location",
       importance: "importance",
+      branch: "branch",
     },
     locationKeys: {
       hk: "HK",
@@ -423,6 +449,17 @@
       pl: "Poland",
       gb: "UK",
       us: "US",
+    },
+    branchKeys: {
+      branch1: "HK1",
+      branch2: "HK2",
+      branch3: "UK1",
+    },
+    hexColorKeys: {
+      color1: "#FF7F7F",
+      color2: "#98FB98",
+      color3: "#87CEFA",
+      color4: "#D8BFD8",
     },
   };
 

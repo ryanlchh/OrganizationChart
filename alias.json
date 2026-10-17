@@ -6,7 +6,8 @@
     "parentId": "parentId",
     "treePriority": "tree_priority",
     "location": "location",
-    "importance": "importance"
+    "importance": "importance",
+    "branch": "branch"
   },
   "locationKeys": {
     "hk": "HK",
@@ -15,5 +16,16 @@
     "pl": "Poland",
     "gb": "UK",
     "us": "US"
+  },
+  "branchKeys": {
+    "branch1": "HK1",
+    "branch2": "HK2",
+    "branch3": "UK1"
+  },
+  "hexColorKeys": {
+    "color1": "#FF7F7F",
+    "color2": "#98FB98",
+    "color3": "#87CEFA",
+    "color4": "#D8BFD8"
   }
 }
