@@ -43,6 +43,32 @@
       });
   }
 
+  function resolveParentNames(rows) {
+    const ids = new Set(rows.map((row) => row.id));
+    const idsByName = new Map();
+    rows.forEach((row) => {
+      const name = row.name.trim();
+      if (!name) return;
+      if (!idsByName.has(name)) idsByName.set(name, []);
+      idsByName.get(name).push(row.id);
+    });
+    for (const row of rows) {
+      const parent = row.parentId.trim();
+      if (!parent || ids.has(parent)) continue;
+      const matches = idsByName.get(parent) || [];
+      if (matches.length === 1) {
+        row.parentId = matches[0];
+      } else if (matches.length > 1) {
+        return (
+          'Parent name "' + parent + '" on person ' + row.id +
+          " matches more than one person (" + matches.join(", ") +
+          "). Put that manager's id in parentId."
+        );
+      }
+    }
+    return "";
+  }
+
   function priorityNumber(value) {
     if (value == null) return null;
     const text = String(value).trim();
@@ -251,6 +277,11 @@
     rawData = normalizeRows(data).filter((row) => row.id !== FOREST_ID);
     if (!rawData.length) {
       showStatus("CSV has no usable rows (need id, name, title, parentId).", true);
+      return;
+    }
+    const parentError = resolveParentNames(rawData);
+    if (parentError) {
+      showStatus(parentError, true);
       return;
     }
     const chartData = withForest(rawData);

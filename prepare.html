@@ -270,6 +270,32 @@
       return true;
     }
 
+    function resolveParentNames(rows) {
+      const ids = new Set(rows.map((row) => row.id));
+      const idsByName = new Map();
+      rows.forEach((row) => {
+        const name = row.name.trim();
+        if (!name) return;
+        if (!idsByName.has(name)) idsByName.set(name, []);
+        idsByName.get(name).push(row.id);
+      });
+      for (const row of rows) {
+        const parent = row.parentId.trim();
+        if (!parent || ids.has(parent)) continue;
+        const matches = idsByName.get(parent) || [];
+        if (matches.length === 1) {
+          row.parentId = matches[0];
+        } else if (matches.length > 1) {
+          return (
+            'Parent name "' + parent + '" on person ' + row.id +
+            " matches more than one person (" + matches.join(", ") +
+            "). Put that manager's id in parentId."
+          );
+        }
+      }
+      return "";
+    }
+
     function cell(row, header) {
       if (Object.prototype.hasOwnProperty.call(row, header)) return row[header];
       const key = Object.keys(row).find((name) => String(name).trim() === header);
@@ -379,6 +405,12 @@
           );
           return;
         }
+      }
+
+      const parentError = resolveParentNames(rows);
+      if (parentError) {
+        setMessage(parentError, true);
+        return;
       }
 
       readyRows = rows;

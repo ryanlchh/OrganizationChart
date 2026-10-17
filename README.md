@@ -39,7 +39,7 @@ CSV / `ORG_DATA` rows:
 | `id` | Yes | Unique string id |
 | `name` | Yes | Display name |
 | `title` | Yes | Role label (directors use `Head of Department` for Jump to View) |
-| `parentId` | Yes | Parent’s `id`; empty, or pointing at a missing id, starts another tree |
+| `parentId` | Yes | Parent’s `id`, or that person’s `name` after trimming. A unique name is rewritten to the id. A name that matches more than one person stops the load so the id can be entered by hand. A blank cell, or a value that matches no id and no name, starts another tree |
 | `treePriority` | Yes; Optional | `0` is the leftmost tree, then `1`, then `2`. A blank cell inherits the smallest number anywhere in that same tree. A mix such as `0` and `1` is not an error: the tree uses `0` and sits before trees numbered `1` or `2`. A tree with no numbers is placed after the numbered trees, in CSV order |
 | `location` | Yes, every person | One of the values in `alias.json` `locationKeys`. The key is the flag file name in `assets` without `.svg` |
 | `importance` | Column required; value may be blank | `Y` shows an asterisk before the name |
@@ -126,7 +126,8 @@ Logic lives in `app.js` (`INITIAL_EXPAND_LEVEL`, `jumpToView`, `resetFullView`).
 | Scripts fail to load | Missing `packages/` folder | Copy `packages/` next to `index.html` |
 | Jump list empty / wrong people | Titles do not match filters | Check `title` values; directors should be `Head of Department` |
 | Prepare page reports a missing column | Header text does not match `alias.json` `columnKeys` | Fix the CSV header or the mapped name, then choose the file again |
-| Several separate trees | Some `parentId` values are blank or point at an id that is not in the file | Expected. Trees are ordered by `treePriority` |
+| Several separate trees | Some `parentId` values are blank, or match neither an id nor a unique name | Expected. Trees are ordered by `treePriority` |
+| Prepare or chart stops on a parent name | That name belongs to more than one person | Put the manager’s `id` in `parentId` |
 
 ## Security / deployment notes
 
