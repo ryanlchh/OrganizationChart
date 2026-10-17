@@ -121,7 +121,10 @@
       .compactMarginBetween(() => 24)
       .compactMarginPair(() => 40)
       .neighbourMargin(() => 28)
-      .nodeContent(nodeContent);
+      .nodeContent(nodeContent)
+      .onExpandOrCollapse((node) => {
+        syncJumpSelection(node);
+      });
 
     sizeChartToContainer();
     chart.render();
@@ -130,6 +133,19 @@
     sizeChartToContainer();
     chart.render().fit();
     window.__orgChart = chart;
+  }
+
+  function syncJumpSelection(node) {
+    if (!node || !node.children) return;
+    let current = node;
+    while (current) {
+      const id = String(current.data.id);
+      if (directorSelect.querySelector('option[value="' + id + '"]')) {
+        directorSelect.value = id;
+        return;
+      }
+      current = current.parent;
+    }
   }
 
   function jumpToView(nodeId) {
