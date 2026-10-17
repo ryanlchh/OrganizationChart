@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prepare org chart data</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    :root {
+      --header-bg: #1e293b;
+      --header-text: #f8fafc;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --canvas: #f1f5f9;
+      --card-border: #cbd5e1;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--canvas);
+      color: #0f172a;
+    }
+
+    header {
+      height: 60px;
+      background: var(--header-bg);
+      color: var(--header-text);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 0 20px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    header a {
+      color: #93c5fd;
+      font-size: 13px;
+      text-decoration: none;
+    }
+
+    header a:hover { text-decoration: underline; }
+
+    main {
+      max-width: 720px;
+      margin: 28px auto;
+      padding: 0 20px 48px;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 22px 24px;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+      margin-bottom: 16px;
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-size: 16px;
+    }
+
+    p {
+      margin: 0 0 12px;
+      line-height: 1.5;
+      color: #334155;
+      font-size: 14px;
+    }
+
+    ol.steps {
+      margin: 0;
+      padding-left: 22px;
+      color: #334155;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    ol.steps li { margin-bottom: 10px; }
+
+    label.file-btn, button {
+      height: 36px;
+      border: none;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 13px;
+      padding: 0 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    label.file-btn input { display: none; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    label.file-btn:hover, button:hover:not(:disabled) { background: var(--accent-hover); }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    #message {
+      margin-top: 16px;
+      font-size: 14px;
+      color: #334155;
+    }
+
+    #message.error { color: #991b1b; }
+
+    .note {
+      font-size: 13px;
+      color: #64748b;
+      background: #f8fafc;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin: 0;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Update the org chart data</h1>
+    <a href="./index.html">Open the org chart</a>
+  </header>
+  <main>
+    <div class="card">
+      <h2>Guide (simple steps)</h2>
+      <ol class="steps">
+        <li>Ask HR or IT for the latest org list as an Excel/CSV file. It must have these columns: <strong>id</strong>, <strong>name</strong>, <strong>title</strong>, <strong>parentId</strong>.</li>
+        <li>Click <strong>Choose CSV</strong> below and pick that file.</li>
+        <li>When the green/ready message appears, click <strong>Download data.js</strong>.</li>
+        <li>Find the downloaded file (usually in your Downloads folder). Move it into the same folder as <code>index.html</code>, and replace the old <code>data.js</code> if asked.</li>
+        <li>Open <code>index.html</code> (or refresh it) to see the updated chart.</li>
+      </ol>
+      <p class="note" style="margin-top: 14px;">
+        You do <strong>not</strong> need Python, Node, or special IT software for this page — only a normal web browser and internet access the first time (to load a helper library).
+        If anything fails, send this page and your CSV to IT.
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>Convert your file</h2>
+      <p>Select your org CSV, then download the data file the chart uses.</p>
+      <div class="actions">
+        <label class="file-btn">
+          Choose CSV
+          <input type="file" id="csvInput" accept=".csv,text/csv" />
+        </label>
+        <button type="button" id="downloadBtn" disabled>Download data.js</button>
+      </div>
+      <div id="message">No file selected yet.</div>
+    </div>
+  </main>
+  <script>
+    const csvInput = document.getElementById("csvInput");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const message = document.getElementById("message");
+
+    let readyRows = null;
+
+    function setMessage(text, isError) {
+      message.textContent = text;
+      message.classList.toggle("error", Boolean(isError));
+    }
+
+    function toRows(parsed) {
+      return parsed
+        .filter((d) => d.id != null && String(d.id).trim() !== "")
+        .map((d) => {
+          const parentId = d.parentId == null ? "" : String(d.parentId).trim();
+          return {
+            id: String(d.id).trim(),
+            name: String(d.name || "").trim(),
+            title: String(d.title || "").trim(),
+            parentId: parentId.toLowerCase() === "null" ? "" : parentId,
+          };
+        });
+    }
+
+    csvInput.addEventListener("change", async (event) => {
+      readyRows = null;
+      downloadBtn.disabled = true;
+      const file = event.target.files && event.target.files[0];
+      if (!file) {
+        setMessage("No file selected yet.");
+        return;
+      }
+
+      let text = "";
+      try {
+        text = await file.text();
+      } catch (err) {
+        setMessage("Could not read that file. Try saving it again as CSV (UTF-8).", true);
+        return;
+      }
+
+      if (!text.trim()) {
+        setMessage("That CSV is empty. Please check the file and try again.", true);
+        return;
+      }
+
+      const parsed = d3.csvParse(text);
+      const columns = parsed.columns || [];
+      if (!columns.includes("id")) {
+        setMessage("This file is missing an id column. Needed columns: id, name, title, parentId.", true);
+        return;
+      }
+
+      const rows = toRows(parsed);
+      if (!rows.length) {
+        setMessage("The file has headers but no people rows. Please check the data.", true);
+        return;
+      }
+
+      readyRows = rows;
+      downloadBtn.disabled = false;
+      setMessage(
+        rows.length +
+          " people found. Ready — click Download data.js, then put that file next to index.html."
+      );
+    });
+
+    downloadBtn.addEventListener("click", () => {
+      if (!readyRows) return;
+      const body = "window.ORG_DATA = " + JSON.stringify(readyRows) + ";\n";
+      const blob = new Blob([body], { type: "text/javascript" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "data.js";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>
