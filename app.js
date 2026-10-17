@@ -35,7 +35,9 @@
           name: String(d.name || "").trim(),
           title: String(d.title || "").trim(),
           parentId: parentId === "" || parentId.toLowerCase() === "null" ? "" : parentId,
-          treePriority: d.treePriority == null ? "" : String(d.treePriority).trim(),
+          treePriority: String(d.treePriority != null ? d.treePriority : (d.tree_priority || "")).trim(),
+          location: String(d.location || "").trim(),
+          importance: String(d.importance || "").trim(),
         };
       });
   }
@@ -143,29 +145,61 @@
       });
   }
 
+  function esc(value) {
+    return String(value).replace(/[&<>"']/g, (ch) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    }[ch]));
+  }
+
+  function flagFile(location) {
+    const map = (window.ALIAS && window.ALIAS.locationKeys) || {};
+    const match = Object.entries(map).find(([, label]) => label === location);
+    return match ? "./assets/" + match[0] + ".svg" : "";
+  }
+
   function nodeContent(d) {
     if (d.data.id === FOREST_ID) {
       return `<div style="width:${d.width}px;height:${d.height}px"></div>`;
     }
     const name = d.data.name || "";
     const title = d.data.title || "";
-    const shortName = name.length > 22 ? `${name.slice(0, 20)}…` : name;
-    const shortTitle = title.length > 28 ? `${title.slice(0, 26)}…` : title;
+    const shortName = name.length > 20 ? `${name.slice(0, 18)}…` : name;
+    const shortTitle = title.length > 26 ? `${title.slice(0, 24)}…` : title;
+    const important = String(d.data.importance || "").trim().toUpperCase() === "Y";
+    const flag = flagFile(d.data.location);
+    const mark = important
+      ? `<span title="Important" style="flex:0 0 auto;margin-right:4px;color:#7ec8e3;font-weight:700;line-height:1;">*</span>`
+      : "";
+    const flagHtml = flag
+      ? `<div style="width:28px;height:28px;border-radius:50%;background:#f4f6f8;border:1px solid #e5e7eb;display:flex;align-items:center;justify-content:center;flex:0 0 auto;"><img src="${esc(flag)}" alt="${esc(d.data.location)}" style="width:18px;height:12px;object-fit:contain;display:block;" /></div>`
+      : "";
     return `
       <div style="
         width:${d.width}px;
         height:${d.height}px;
-        padding:10px 12px;
+        padding:8px 10px 8px 8px;
         background:#fff;
         border:2px solid #cbd5e1;
         border-radius:8px;
         display:flex;
-        flex-direction:column;
-        justify-content:center;
+        align-items:center;
+        gap:8px;
         box-sizing:border-box;
       ">
-        <div style="font-size:13px;font-weight:700;color:#1e293b;line-height:1.2;">${shortName}</div>
-        <div style="font-size:11px;color:#64748b;margin-top:4px;line-height:1.2;">${shortTitle}</div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:28px;flex:0 0 auto;">
+          ${flagHtml}
+          <div class="location-indicators" style="display:flex;flex-direction:column;align-items:center;gap:3px;min-height:8px;"></div>
+        </div>
+        <div style="min-width:0;flex:1 1 auto;">
+          <div style="display:flex;align-items:center;font-size:13px;font-weight:700;color:#1e293b;line-height:1.2;">
+            ${mark}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(shortName)}</span>
+          </div>
+          <div style="font-size:11px;color:#64748b;margin-top:4px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(shortTitle)}</div>
+        </div>
       </div>
     `;
   }
@@ -204,8 +238,8 @@
     chart = new d3.OrgChart()
       .container("#chart-container")
       .data(chartData)
-      .nodeWidth((d) => (d.data.id === FOREST_ID ? 8 : 200))
-      .nodeHeight((d) => (d.data.id === FOREST_ID ? 8 : 56))
+      .nodeWidth((d) => (d.data.id === FOREST_ID ? 8 : 228))
+      .nodeHeight((d) => (d.data.id === FOREST_ID ? 8 : 72))
       .nodeButtonWidth((d) => (d.data.id === FOREST_ID ? 0 : 40))
       .nodeButtonHeight((d) => (d.data.id === FOREST_ID ? 0 : 40))
       .childrenMargin(() => 40)
@@ -372,7 +406,39 @@
     buildChart(parsed);
   }
 
+  const FALLBACK_ALIAS = {
+    columnKeys: {
+      id: "id",
+      name: "name",
+      title: "title",
+      parentId: "parentId",
+      treePriority: "tree_priority",
+      location: "location",
+      importance: "importance",
+    },
+    locationKeys: {
+      hk: "HK",
+      in: "India",
+      cn: "Mainland China",
+      pl: "Poland",
+      gb: "UK",
+      us: "US",
+    },
+  };
+
+  async function loadAlias() {
+    if (window.ALIAS && window.ALIAS.locationKeys && window.ALIAS.columnKeys) return;
+    try {
+      const response = await fetch("./alias.json");
+      if (!response.ok) throw new Error("missing");
+      window.ALIAS = await response.json();
+    } catch (err) {
+      window.ALIAS = FALLBACK_ALIAS;
+    }
+  }
+
   async function tryFetchDefaultCsv() {
+    await loadAlias();
     // Bundled data works by double-clicking index.html (no Node, no server).
     if (Array.isArray(window.ORG_DATA) && window.ORG_DATA.length) {
       buildChart(window.ORG_DATA);

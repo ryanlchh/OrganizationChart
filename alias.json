@@ -1,0 +1,19 @@
+{
+  "columnKeys": {
+    "id": "id",
+    "name": "name",
+    "title": "title",
+    "parentId": "parentId",
+    "treePriority": "tree_priority",
+    "location": "location",
+    "importance": "importance"
+  },
+  "locationKeys": {
+    "hk": "HK",
+    "in": "India",
+    "cn": "Mainland China",
+    "pl": "Poland",
+    "gb": "UK",
+    "us": "US"
+  }
+}

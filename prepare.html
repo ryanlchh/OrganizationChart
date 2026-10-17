@@ -188,8 +188,8 @@
     <div class="card">
       <h2>Guide (simple steps)</h2>
       <ol class="steps">
-        <li>Ask IT for the latest org list as a CSV. Column titles can differ by market. IT keeps the real names in <code>columns.json</code>.</li>
-        <li>This page loads <code>columns.json</code> from the same folder. If it cannot, click <strong>Mapping JSON</strong> and choose that file.</li>
+        <li>Ask IT for the latest org list as a CSV. Column titles can differ by market. IT keeps those names, and the location flags, in <code>alias.json</code>.</li>
+        <li>This page loads <code>alias.json</code> from the same folder. If it cannot, click <strong>Mapping JSON</strong> and choose that file.</li>
         <li>Click <strong>Choose CSV</strong> and pick the org file. If a mapped column is missing, the message names it so IT can fix the file or the map.</li>
         <li>When the ready message appears, click <strong>Download data.js</strong>.</li>
         <li>Find the downloaded file (usually in your Downloads folder). Move it into the same folder as <code>index.html</code>, and replace the old <code>data.js</code> if asked.</li>
@@ -215,12 +215,12 @@
         </label>
         <button type="button" id="downloadBtn" disabled>Download data.js</button>
       </div>
-      <div id="mapStatus">Looking for columns.json…</div>
+      <div id="mapStatus">Looking for alias.json…</div>
       <div id="message">No file selected yet.</div>
     </div>
   </main>
   <script>
-    const MAP_KEYS = ["id", "name", "title", "parentId", "treePriority"];
+    const MAP_KEYS = ["id", "name", "title", "parentId", "treePriority", "location", "importance"];
     const csvInput = document.getElementById("csvInput");
     const mapInput = document.getElementById("mapInput");
     const downloadBtn = document.getElementById("downloadBtn");
@@ -240,12 +240,16 @@
       mapStatus.classList.toggle("error", Boolean(isError));
     }
 
-    function acceptMap(map, sourceLabel) {
+    function acceptMap(alias, sourceLabel) {
+      const map = alias && alias.columnKeys;
+      const locations = alias && alias.locationKeys;
       const missingKeys = MAP_KEYS.filter((key) => !map || String(map[key] == null ? "" : map[key]).trim() === "");
-      if (missingKeys.length) {
+      const locationCount = locations && typeof locations === "object" ? Object.keys(locations).length : 0;
+      if (missingKeys.length || !locationCount) {
         columnMap = null;
+        window.ALIAS = null;
         setMapStatus(
-          sourceLabel + " is missing keys: " + missingKeys.join(", ") + ". Expected id, name, title, parentId, treePriority.",
+          sourceLabel + " must include columnKeys (id, name, title, parentId, treePriority, location, importance) and locationKeys.",
           true
         );
         return false;
@@ -254,6 +258,10 @@
       MAP_KEYS.forEach((key) => {
         columnMap[key] = String(map[key]).trim();
       });
+      window.ALIAS = {
+        columnKeys: columnMap,
+        locationKeys: locations,
+      };
       setMapStatus("Using mapping from " + sourceLabel + ".");
       return true;
     }
@@ -270,12 +278,16 @@
         .map((d) => {
           const parentId = String(cell(d, map.parentId) || "").trim();
           const priority = String(cell(d, map.treePriority) || "").trim();
+          const location = String(cell(d, map.location) || "").trim();
+          const importance = String(cell(d, map.importance) || "").trim();
           return {
             id: String(cell(d, map.id)).trim(),
             name: String(cell(d, map.name) || "").trim(),
             title: String(cell(d, map.title) || "").trim(),
             parentId: parentId.toLowerCase() === "null" ? "" : parentId,
             treePriority: priority.toLowerCase() === "null" ? "" : priority,
+            location: location.toLowerCase() === "null" ? "" : location,
+            importance: importance.toLowerCase() === "null" ? "" : importance,
           };
         });
     }
@@ -284,7 +296,7 @@
       readyRows = null;
       downloadBtn.disabled = true;
       if (!columnMap) {
-        setMessage("Choose columns.json before the CSV, or keep columns.json beside this page.", true);
+        setMessage("Choose alias.json before the CSV, or keep alias.json beside this page.", true);
         return;
       }
       if (!text.trim()) {
@@ -300,13 +312,25 @@
         const detail = missing
           .map((key) => '"' + columnMap[key] + '" (needed for ' + key + ")")
           .join(", ");
-        setMessage("Missing column " + detail + ". Check columns.json against this CSV.", true);
+        setMessage("Missing column " + detail + ". Check alias.json columnKeys against this CSV.", true);
         return;
       }
 
       const rows = toRows(parsed, columnMap);
       if (!rows.length) {
         setMessage("The file has headers but no people rows. Please check the data.", true);
+        return;
+      }
+
+      const allowedLocations = new Set(Object.values((window.ALIAS && window.ALIAS.locationKeys) || {}));
+      const badLocation = rows.find((row) => !row.location || !allowedLocations.has(row.location));
+      if (badLocation) {
+        const known = Array.from(allowedLocations).join(", ");
+        setMessage(
+          'Person ' + badLocation.id + ' has location "' + (badLocation.location || "") +
+            '". Every person needs a location from alias.json locationKeys: ' + known + '.',
+          true
+        );
         return;
       }
 
@@ -346,14 +370,14 @@
       }
     });
 
-    fetch("./columns.json")
+    fetch("./alias.json")
       .then((response) => {
         if (!response.ok) throw new Error("missing");
         return response.json();
       })
-      .then((map) => acceptMap(map, "columns.json"))
+      .then((map) => acceptMap(map, "alias.json"))
       .catch(() => {
-        setMapStatus("Could not read columns.json automatically. Click Mapping JSON and choose that file.", true);
+        setMapStatus("Could not read alias.json automatically. Click Mapping JSON and choose that file.", true);
       });
 
     downloadBtn.addEventListener("click", () => {

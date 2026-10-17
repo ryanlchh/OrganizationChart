@@ -11,7 +11,7 @@ Static browser app for viewing a company hierarchy. No Python, Node, or local se
 | `data.js` | Bundled org data (`window.ORG_DATA`) used on open |
 | `packages/` | Offline copies of D3, d3-org-chart, d3-flextree |
 | `hr_org.csv` | Sample org file (optional; for updates) |
-| `columns.json` | Maps logical fields to the market's CSV header names |
+| `alias.json` | Column header names and location-to-flag names |
 | `prepare.html` | Browser tool to rebuild `data.js` from a CSV (no Python) |
 | `README.md` | Maintenance note |
 
@@ -41,20 +41,34 @@ CSV / `ORG_DATA` rows:
 | `title` | Yes | Role label (directors use `Head of Department` for Jump to View) |
 | `parentId` | Yes | Parent’s `id`; empty, or pointing at a missing id, starts another tree |
 | `treePriority` | Yes; Optional | `0` is the leftmost tree, then `1`, then `2`. A blank cell inherits the smallest number anywhere in that same tree. A mix such as `0` and `1` is not an error: the tree uses `0` and sits before trees numbered `1` or `2`. A tree with no numbers is placed after the numbered trees, in CSV order |
+| `location` | Yes, every person | One of the values in `alias.json` `locationKeys`. The key is the flag file name in `assets` without `.svg` |
+| `importance` | Column required; value may be blank | `Y` shows an asterisk before the name |
 
-`data.js` always uses those canonical field names. Market CSV headers can differ. `columns.json` supplies the real header for each field. Column order does not matter.
+`data.js` always uses those canonical field names. Market CSV headers can differ. `alias.json` `columnKeys` supplies the real header for each field. Column order does not matter.
 
-## Column map (per market)
+## Alias file
 
-Edit only the values in `columns.json`:
+Edit `alias.json` only. `columnKeys` maps fields to CSV headers. `locationKeys` maps a flag file name (no `.svg`) to the location text stored on each person.
 
 ```json
 {
-  "id": "id",
-  "name": "name",
-  "title": "title",
-  "parentId": "parentId",
-  "treePriority": "tree_priority"
+  "columnKeys": {
+    "id": "id",
+    "name": "name",
+    "title": "title",
+    "parentId": "parentId",
+    "treePriority": "tree_priority",
+    "location": "location",
+    "importance": "importance"
+  },
+  "locationKeys": {
+    "hk": "HK",
+    "in": "India",
+    "cn": "Mainland China",
+    "pl": "Poland",
+    "gb": "UK",
+    "us": "US"
+  }
 }
 ```
 
@@ -72,8 +86,8 @@ Then open `prepare.html`, choose the CSV, and download a new `data.js`. If a map
 
 Preferred path on locked-down laptops:
 
-1. Open `prepare.html` in a browser. It reads `columns.json` from the same folder. If that is blocked, use **Mapping JSON** and pick the file.
-2. Choose the new CSV (headers must match `columns.json`).
+1. Open `prepare.html` in a browser. It reads `alias.json` from the same folder. If that is blocked, use **Mapping JSON** and pick `alias.json`.
+2. Choose the new CSV (headers must match `columnKeys`).
 3. Download `data.js`.
 4. Replace the existing `data.js` beside `index.html`.
 5. Refresh / reopen `index.html`.
@@ -96,7 +110,7 @@ Logic lives in `app.js` (`INITIAL_EXPAND_LEVEL`, `jumpToView`, `resetFullView`).
 | Blank chart / error about data | Missing `data.js` or wrong folder | Ensure all three core files are together |
 | Scripts fail to load | Missing `packages/` folder | Copy `packages/` next to `index.html` |
 | Jump list empty / wrong people | Titles do not match filters | Check `title` values; directors should be `Head of Department` |
-| Prepare page reports a missing column | Header text does not match `columns.json` | Fix the CSV header or the mapped name, then choose the file again |
+| Prepare page reports a missing column | Header text does not match `alias.json` `columnKeys` | Fix the CSV header or the mapped name, then choose the file again |
 | Several separate trees | Some `parentId` values are blank or point at an id that is not in the file | Expected. Trees are ordered by `treePriority` |
 
 ## Security / deployment notes
