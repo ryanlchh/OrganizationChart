@@ -83,10 +83,21 @@
     `;
   }
 
+  function sizeChartToContainer() {
+    if (!chart) return;
+    const el = document.getElementById("chart-container");
+    const rect = el.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) return;
+    chart.svgWidth(rect.width).svgHeight(rect.height);
+  }
+
   function applyInitialExpansion() {
     if (!chart) return;
-    chart.collapseAll();
-    chart.expandToLevel(INITIAL_EXPAND_LEVEL);
+    const state = chart.getChartState();
+    // depth 0–1 expanded (CEO and VPs) so directors are visible; staff stay folded
+    state.allNodes.forEach((d) => {
+      d.data._expanded = d.depth < INITIAL_EXPAND_LEVEL;
+    });
   }
 
   function buildChart(data) {
@@ -110,11 +121,15 @@
       .compactMarginBetween(() => 24)
       .compactMarginPair(() => 40)
       .neighbourMargin(() => 28)
-      .nodeContent(nodeContent)
-      .render();
+      .nodeContent(nodeContent);
+
+    sizeChartToContainer();
+    chart.render();
 
     applyInitialExpansion();
+    sizeChartToContainer();
     chart.render().fit();
+    window.__orgChart = chart;
   }
 
   function jumpToView(nodeId) {

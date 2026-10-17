@@ -7,12 +7,13 @@
   <script src="./packages/d3.v7.min.js"></script>
   <style>
     :root {
-      --header-bg: #1e293b;
-      --header-text: #f8fafc;
-      --accent: #3b82f6;
-      --accent-hover: #2563eb;
-      --canvas: #f1f5f9;
-      --card-border: #cbd5e1;
+      --header-bg: #ffffff;
+      --header-text: #000000;
+      --accent: #db0011;
+      --accent-hover: #af000d;
+      --canvas: #f3f3f3;
+      --card-border: #e0e0e0;
+      --line: #eeeeee;
     }
 
     * { box-sizing: border-box; }
@@ -20,49 +21,91 @@
     body {
       margin: 0;
       min-height: 100vh;
+      display: flex;
+      flex-direction: column;
       font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
       background: var(--canvas);
       color: #0f172a;
     }
 
     header {
-      height: 60px;
-      background: var(--header-bg);
-      color: var(--header-text);
+      background: #fff;
+      color: #000;
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
+      gap: 12px 24px;
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
       gap: 16px;
-      padding: 0 20px;
+      min-width: 0;
+    }
+
+    .brand img {
+      height: 28px;
+      width: auto;
+      display: block;
     }
 
     header h1 {
       margin: 0;
-      font-size: 18px;
-      font-weight: 600;
+      font-size: 15px;
+      font-weight: 400;
+      line-height: 1.3;
+      color: #000;
     }
 
     header a {
-      color: #93c5fd;
-      font-size: 13px;
+      color: #000;
+      font-size: 14px;
       text-decoration: none;
     }
 
     header a:hover { text-decoration: underline; }
 
+    main { flex: 1 0 auto; }
+
+    footer {
+      background: #fff;
+      border-top: 1px solid var(--line);
+      text-align: center;
+      font-size: 12px;
+      color: #333;
+      padding: 8px 12px;
+    }
+
     main {
       max-width: 720px;
       margin: 28px auto;
-      padding: 0 20px 48px;
+      padding: 0 16px 48px;
     }
 
     .card {
       background: #fff;
       border: 1px solid var(--card-border);
       border-radius: 10px;
-      padding: 22px 24px;
+      padding: 18px 18px;
       box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
       margin-bottom: 16px;
+    }
+
+    @media (max-width: 560px) {
+      .actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      label.file-btn, button {
+        width: 100%;
+        justify-content: center;
+        min-height: 44px;
+      }
     }
 
     h2 {
@@ -88,7 +131,7 @@
     ol.steps li { margin-bottom: 10px; }
 
     label.file-btn, button {
-      height: 36px;
+      min-height: 36px;
       border: none;
       border-radius: 6px;
       background: var(--accent);
@@ -133,7 +176,10 @@
 </head>
 <body>
   <header>
-    <h1>Update the org chart data</h1>
+    <div class="brand">
+      <img src="./logo-200x25.svg" alt="logo" />
+      <h1>Update the org chart data</h1>
+    </div>
     <a href="./index.html">Open the org chart</a>
   </header>
   <main>
@@ -248,5 +294,6 @@
       URL.revokeObjectURL(url);
     });
   </script>
+  <footer>Internal Use only</footer>
 </body>
 </html>
