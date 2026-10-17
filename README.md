@@ -9,22 +9,25 @@ Static browser app for viewing a company hierarchy. No Python, Node, or local se
 | `index.html` | Main chart page (open this) |
 | `app.js` | Chart behaviour: pan/zoom, Jump to View, expand/collapse, reset |
 | `data.js` | Bundled org data (`window.ORG_DATA`) used on open |
+| `packages/` | Offline copies of D3, d3-org-chart, d3-flextree |
 | `hr_org.csv` | Source spreadsheet format (optional; for updates) |
 | `prepare.html` | Browser tool to rebuild `data.js` from a CSV (no Python) |
-| `README.md` | This maintenance note |
+| `README.md` | Maintenance note |
 
-**Minimum package for end users:** `index.html` + `app.js` + `data.js`  
-(Internet access is needed on first open for CDN libraries.)
+**Minimum package for end users:** `index.html` + `app.js` + `data.js` + the whole `packages/` folder  
+(No internet required once these files are copied.)
 
-## Runtime dependencies (CDN)
+## Runtime libraries (offline)
 
-Loaded by `index.html` / `prepare.html`:
+Scripts are loaded from `packages/` (not from CDN):
 
-- D3 v7 — `https://d3js.org/d3.v7.min.js`
-- d3-org-chart v3 — `https://cdn.jsdelivr.net/npm/d3-org-chart@3`
-- d3-flextree — `https://cdn.jsdelivr.net/npm/d3-flextree@2.1.2/build/d3-flextree.js`
+| File | Library |
+|------|---------|
+| `packages/d3.v7.min.js` | D3 v7 |
+| `packages/d3-org-chart.min.js` | d3-org-chart v3 |
+| `packages/d3-flextree.js` | d3-flextree 2.1.2 |
 
-If the company network blocks these hosts, the page will not render. Options: allowlist the CDNs, or host the same script files locally and point the `<script src>` tags at them.
+To refresh a library later, re-download from the original CDN into the same filenames, or ask a developer to update `packages/`.
 
 ## Data format
 
@@ -41,8 +44,8 @@ Sample hierarchy in the demo: CEO → C-suite → Heads of Department → staff.
 
 ## How users open the chart
 
-1. Keep `index.html`, `app.js`, and `data.js` in the same folder.
-2. Double-click `index.html` (works offline for data; CDNs still need network unless mirrored).
+1. Keep `index.html`, `app.js`, `data.js`, and the `packages/` folder together.
+2. Double-click `index.html` — fully offline; no CDN needed.
 3. Use **How to use** on the page for business-facing steps.
 
 `file://` cannot reliably `fetch` a sibling CSV; that is why data is bundled in `data.js`.
@@ -73,7 +76,7 @@ Logic lives in `app.js` (`INITIAL_EXPAND_LEVEL`, `jumpToView`, `resetFullView`).
 | Symptom | Likely cause | Action |
 |---------|--------------|--------|
 | Blank chart / error about data | Missing `data.js` or wrong folder | Ensure all three core files are together |
-| Scripts fail to load | CDN blocked | Allowlist CDNs or host scripts locally |
+| Scripts fail to load | Missing `packages/` folder | Copy `packages/` next to `index.html` |
 | Jump list empty / wrong people | Titles do not match filters | Check `title` values; directors should be `Head of Department` |
 | Prepare page cannot parse file | Bad CSV | UTF-8 CSV with header `id,name,title,parentId` |
 | Orphan / cycle in tree | Bad `parentId` | Validate every `parentId` exists as an `id` (except root) |

@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MNC Executive Org Chart Explorer</title>
-  <script src="https://d3js.org/d3.v7.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/d3-org-chart@3"></script>
-  <script src="https://cdn.jsdelivr.net/npm/d3-flextree@2.1.2/build/d3-flextree.js"></script>
+  <script src="./packages/d3.v7.min.js"></script>
+  <script src="./packages/d3-org-chart.min.js"></script>
+  <script src="./packages/d3-flextree.js"></script>
   <style>
     :root {
       --header-bg: #1e293b;
@@ -218,7 +218,7 @@
     </ol>
     <p class="tip">
       You only need to open this page in your browser (double-click <code>index.html</code>).
-      If the chart is empty, ask IT to check that <code>data.js</code> is in the same folder.
+      If the chart is empty, ask IT to check that <code>data.js</code> and the <code>packages</code> folder are next to this page.
       <em>Load CSV</em> is optional and usually for IT or a one-off demo — most users can ignore it.
     </p>
   </aside>
