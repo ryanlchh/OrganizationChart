@@ -155,13 +155,15 @@
       margin-top: 8px;
     }
 
-    #message {
+    #message, #mapStatus {
       margin-top: 16px;
       font-size: 14px;
       color: #334155;
     }
 
-    #message.error { color: #991b1b; }
+    #mapStatus { margin-top: 14px; }
+
+    #message.error, #mapStatus.error { color: #991b1b; }
 
     .note {
       font-size: 13px;
@@ -186,9 +188,10 @@
     <div class="card">
       <h2>Guide (simple steps)</h2>
       <ol class="steps">
-        <li>Ask HR or IT for the latest org list as an Excel/CSV file. It must have these columns: <strong>id</strong>, <strong>name</strong>, <strong>title</strong>, <strong>parentId</strong>.</li>
-        <li>Click <strong>Choose CSV</strong> below and pick that file.</li>
-        <li>When the green/ready message appears, click <strong>Download data.js</strong>.</li>
+        <li>Ask IT for the latest org list as a CSV. Column titles can differ by market. IT keeps the real names in <code>columns.json</code>.</li>
+        <li>This page loads <code>columns.json</code> from the same folder. If it cannot, click <strong>Mapping JSON</strong> and choose that file.</li>
+        <li>Click <strong>Choose CSV</strong> and pick the org file. If a mapped column is missing, the message names it so IT can fix the file or the map.</li>
+        <li>When the ready message appears, click <strong>Download data.js</strong>.</li>
         <li>Find the downloaded file (usually in your Downloads folder). Move it into the same folder as <code>index.html</code>, and replace the old <code>data.js</code> if asked.</li>
         <li>Open <code>index.html</code> (or refresh it) to see the updated chart.</li>
       </ol>
@@ -200,60 +203,90 @@
 
     <div class="card">
       <h2>Convert your file</h2>
-      <p>Select your org CSV, then download the data file the chart uses.</p>
+      <p>Select your org CSV, then download the data file the chart uses. Header order does not matter.</p>
       <div class="actions">
+        <label class="file-btn">
+          Mapping JSON
+          <input type="file" id="mapInput" accept=".json,application/json" />
+        </label>
         <label class="file-btn">
           Choose CSV
           <input type="file" id="csvInput" accept=".csv,text/csv" />
         </label>
         <button type="button" id="downloadBtn" disabled>Download data.js</button>
       </div>
+      <div id="mapStatus">Looking for columns.json…</div>
       <div id="message">No file selected yet.</div>
     </div>
   </main>
   <script>
+    const MAP_KEYS = ["id", "name", "title", "parentId", "treePriority"];
     const csvInput = document.getElementById("csvInput");
+    const mapInput = document.getElementById("mapInput");
     const downloadBtn = document.getElementById("downloadBtn");
     const message = document.getElementById("message");
+    const mapStatus = document.getElementById("mapStatus");
 
     let readyRows = null;
+    let columnMap = null;
 
     function setMessage(text, isError) {
       message.textContent = text;
       message.classList.toggle("error", Boolean(isError));
     }
 
-    function toRows(parsed) {
+    function setMapStatus(text, isError) {
+      mapStatus.textContent = text;
+      mapStatus.classList.toggle("error", Boolean(isError));
+    }
+
+    function acceptMap(map, sourceLabel) {
+      const missingKeys = MAP_KEYS.filter((key) => !map || String(map[key] == null ? "" : map[key]).trim() === "");
+      if (missingKeys.length) {
+        columnMap = null;
+        setMapStatus(
+          sourceLabel + " is missing keys: " + missingKeys.join(", ") + ". Expected id, name, title, parentId, treePriority.",
+          true
+        );
+        return false;
+      }
+      columnMap = {};
+      MAP_KEYS.forEach((key) => {
+        columnMap[key] = String(map[key]).trim();
+      });
+      setMapStatus("Using mapping from " + sourceLabel + ".");
+      return true;
+    }
+
+    function cell(row, header) {
+      if (Object.prototype.hasOwnProperty.call(row, header)) return row[header];
+      const key = Object.keys(row).find((name) => String(name).trim() === header);
+      return key ? row[key] : "";
+    }
+
+    function toRows(parsed, map) {
       return parsed
-        .filter((d) => d.id != null && String(d.id).trim() !== "")
+        .filter((d) => String(cell(d, map.id) || "").trim() !== "")
         .map((d) => {
-          const parentId = d.parentId == null ? "" : String(d.parentId).trim();
+          const parentId = String(cell(d, map.parentId) || "").trim();
+          const priority = String(cell(d, map.treePriority) || "").trim();
           return {
-            id: String(d.id).trim(),
-            name: String(d.name || "").trim(),
-            title: String(d.title || "").trim(),
+            id: String(cell(d, map.id)).trim(),
+            name: String(cell(d, map.name) || "").trim(),
+            title: String(cell(d, map.title) || "").trim(),
             parentId: parentId.toLowerCase() === "null" ? "" : parentId,
+            treePriority: priority.toLowerCase() === "null" ? "" : priority,
           };
         });
     }
 
-    csvInput.addEventListener("change", async (event) => {
+    function readCsvText(text) {
       readyRows = null;
       downloadBtn.disabled = true;
-      const file = event.target.files && event.target.files[0];
-      if (!file) {
-        setMessage("No file selected yet.");
+      if (!columnMap) {
+        setMessage("Choose columns.json before the CSV, or keep columns.json beside this page.", true);
         return;
       }
-
-      let text = "";
-      try {
-        text = await file.text();
-      } catch (err) {
-        setMessage("Could not read that file. Try saving it again as CSV (UTF-8).", true);
-        return;
-      }
-
       if (!text.trim()) {
         setMessage("That CSV is empty. Please check the file and try again.", true);
         return;
@@ -261,12 +294,17 @@
 
       const parsed = d3.csvParse(text);
       const columns = parsed.columns || [];
-      if (!columns.includes("id")) {
-        setMessage("This file is missing an id column. Needed columns: id, name, title, parentId.", true);
+      const trimmed = columns.map((name) => String(name).trim());
+      const missing = MAP_KEYS.filter((key) => !trimmed.includes(columnMap[key]));
+      if (missing.length) {
+        const detail = missing
+          .map((key) => '"' + columnMap[key] + '" (needed for ' + key + ")")
+          .join(", ");
+        setMessage("Missing column " + detail + ". Check columns.json against this CSV.", true);
         return;
       }
 
-      const rows = toRows(parsed);
+      const rows = toRows(parsed, columnMap);
       if (!rows.length) {
         setMessage("The file has headers but no people rows. Please check the data.", true);
         return;
@@ -278,7 +316,45 @@
         rows.length +
           " people found. Ready — click Download data.js, then put that file next to index.html."
       );
+    }
+
+    mapInput.addEventListener("change", async (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      try {
+        const map = JSON.parse(await file.text());
+        acceptMap(map, file.name);
+      } catch (err) {
+        columnMap = null;
+        setMapStatus("That mapping file is not valid JSON.", true);
+      }
+      readyRows = null;
+      downloadBtn.disabled = true;
+      setMessage("Mapping updated. Choose the CSV again.");
     });
+
+    csvInput.addEventListener("change", async (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) {
+        setMessage("No file selected yet.");
+        return;
+      }
+      try {
+        readCsvText(await file.text());
+      } catch (err) {
+        setMessage("Could not read that file. Try saving it again as CSV (UTF-8).", true);
+      }
+    });
+
+    fetch("./columns.json")
+      .then((response) => {
+        if (!response.ok) throw new Error("missing");
+        return response.json();
+      })
+      .then((map) => acceptMap(map, "columns.json"))
+      .catch(() => {
+        setMapStatus("Could not read columns.json automatically. Click Mapping JSON and choose that file.", true);
+      });
 
     downloadBtn.addEventListener("click", () => {
       if (!readyRows) return;

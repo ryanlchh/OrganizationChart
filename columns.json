@@ -1,0 +1,7 @@
+{
+  "id": "id",
+  "name": "name",
+  "title": "title",
+  "parentId": "parentId",
+  "treePriority": "tree_priority"
+}

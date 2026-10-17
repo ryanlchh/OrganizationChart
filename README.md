@@ -10,7 +10,8 @@ Static browser app for viewing a company hierarchy. No Python, Node, or local se
 | `app.js` | Chart behaviour: pan/zoom, Jump to View, expand/collapse, reset |
 | `data.js` | Bundled org data (`window.ORG_DATA`) used on open |
 | `packages/` | Offline copies of D3, d3-org-chart, d3-flextree |
-| `hr_org.csv` | Source spreadsheet format (optional; for updates) |
+| `hr_org.csv` | Sample org file (optional; for updates) |
+| `columns.json` | Maps logical fields to the market's CSV header names |
 | `prepare.html` | Browser tool to rebuild `data.js` from a CSV (no Python) |
 | `README.md` | Maintenance note |
 
@@ -38,9 +39,26 @@ CSV / `ORG_DATA` rows:
 | `id` | Yes | Unique string id |
 | `name` | Yes | Display name |
 | `title` | Yes | Role label (directors use `Head of Department` for Jump to View) |
-| `parentId` | Yes | Parent’s `id`; empty for the root (CEO) |
+| `parentId` | Yes | Parent’s `id`; empty, or pointing at a missing id, starts another tree |
+| `treePriority` | Yes; Optional | `0` is the leftmost tree, then `1`, then `2`. A blank cell inherits the smallest number anywhere in that same tree. A mix such as `0` and `1` is not an error: the tree uses `0` and sits before trees numbered `1` or `2`. A tree with no numbers is placed after the numbered trees, in CSV order |
 
-Sample hierarchy in the demo: CEO → C-suite → Heads of Department → staff.
+`data.js` always uses those canonical field names. Market CSV headers can differ. `columns.json` supplies the real header for each field. Column order does not matter.
+
+## Column map (per market)
+
+Edit only the values in `columns.json`:
+
+```json
+{
+  "id": "id",
+  "name": "name",
+  "title": "title",
+  "parentId": "parentId",
+  "treePriority": "tree_priority"
+}
+```
+
+Then open `prepare.html`, choose the CSV, and download a new `data.js`. If a mapped header is not in the file, the page stops and names the missing column. Conflicting priority numbers do not stop the download.
 
 ## How users open the chart
 
@@ -54,8 +72,8 @@ Sample hierarchy in the demo: CEO → C-suite → Heads of Department → staff.
 
 Preferred path on locked-down laptops:
 
-1. Open `prepare.html` in a browser.
-2. Choose the new `hr_org.csv` (or equivalent).
+1. Open `prepare.html` in a browser. It reads `columns.json` from the same folder. If that is blocked, use **Mapping JSON** and pick the file.
+2. Choose the new CSV (headers must match `columns.json`).
 3. Download `data.js`.
 4. Replace the existing `data.js` beside `index.html`.
 5. Refresh / reopen `index.html`.
@@ -78,8 +96,8 @@ Logic lives in `app.js` (`INITIAL_EXPAND_LEVEL`, `jumpToView`, `resetFullView`).
 | Blank chart / error about data | Missing `data.js` or wrong folder | Ensure all three core files are together |
 | Scripts fail to load | Missing `packages/` folder | Copy `packages/` next to `index.html` |
 | Jump list empty / wrong people | Titles do not match filters | Check `title` values; directors should be `Head of Department` |
-| Prepare page cannot parse file | Bad CSV | UTF-8 CSV with header `id,name,title,parentId` |
-| Orphan / cycle in tree | Bad `parentId` | Validate every `parentId` exists as an `id` (except root) |
+| Prepare page reports a missing column | Header text does not match `columns.json` | Fix the CSV header or the mapped name, then choose the file again |
+| Several separate trees | Some `parentId` values are blank or point at an id that is not in the file | Expected. Trees are ordered by `treePriority` |
 
 ## Security / deployment notes
 

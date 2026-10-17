@@ -50,7 +50,6 @@
       padding-left: max(24px, env(safe-area-inset-left));
       padding-right: max(24px, env(safe-area-inset-right));
       border-bottom: 1px solid var(--line);
-      z-index: 10;
     }
 
     .brand {
@@ -85,6 +84,112 @@
       flex: 0 0 auto;
       align-items: center;
       justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .search-wrap {
+      position: relative;
+    }
+
+    .search-box {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: clamp(132px, 28vw, 240px);
+      height: 36px;
+      padding: 0 10px;
+      background: #f6f6f6;
+      border: 1px solid #e6e6e6;
+      border-radius: 18px;
+      color: #333;
+    }
+
+    .search-box:focus-within {
+      background: #fff;
+      border-color: #db0011;
+      box-shadow: 0 0 0 3px rgba(219, 0, 17, 0.12);
+    }
+
+    .search-box svg {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 auto;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.75;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .search-box input {
+      width: 100%;
+      min-width: 0;
+      border: 0;
+      outline: none;
+      background: transparent;
+      font: inherit;
+      font-size: 13px;
+      color: #111;
+    }
+
+    .search-box input::placeholder { color: #8a8a8a; }
+
+    #searchResults {
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      z-index: 30;
+      width: min(280px, 72vw);
+      margin: 0;
+      padding: 4px;
+      list-style: none;
+      background: #fff;
+      border: 1px solid #e8e8e8;
+      border-radius: 10px;
+      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14);
+      max-height: 260px;
+      overflow: auto;
+    }
+
+    #searchResults[hidden] { display: none; }
+
+    #searchResults button {
+      width: 100%;
+      min-height: 40px;
+      padding: 6px 10px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: #111;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      text-align: left;
+    }
+
+    #searchResults button:hover,
+    #searchResults button[aria-selected="true"] {
+      background: #f6f6f6;
+      color: #111;
+    }
+
+    #searchResults .hit-name {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    #searchResults .hit-meta {
+      font-size: 11px;
+      color: #667085;
+      line-height: 1.2;
+    }
+
+    #searchResults .empty {
+      padding: 10px 12px;
+      font-size: 12px;
+      color: #667085;
     }
 
     #jump-bar {
@@ -369,6 +474,18 @@
       <h1>Global Leadership &amp; Organization View</h1>
     </div>
     <div class="controls">
+      <div class="search-wrap">
+        <form id="searchForm" role="search" autocomplete="off">
+          <label class="search-box">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="7"/>
+              <path d="M20 20l-3.5-3.5"/>
+            </svg>
+            <input id="personSearch" type="search" placeholder="Name or ID" aria-label="Search by name or ID" />
+          </label>
+        </form>
+        <ul id="searchResults" hidden></ul>
+      </div>
       <button type="button" class="icon-btn" id="resetBtn" title="Reset full view" aria-label="Reset full view">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M3 12a9 9 0 1 0 3-6.7"/>
@@ -394,6 +511,7 @@
     <h2>Quick guide</h2>
     <ol>
       <li><strong>See the big picture</strong> — The map opens showing leadership down to directors. Drag to move around. Pinch or scroll to zoom.</li>
+      <li><strong>Search</strong> — Use the search box in the header. Type a name or an ID, then press Enter or tap a result. The chart opens that person.</li>
       <li><strong>Jump to a person</strong> — Use <em>Jump to View</em> just above the chart and pick a director or leader. The chart zooms to them and shows their team. Opening a director on the chart also selects them here.</li>
       <li><strong>Hide or show a team</strong> — Tap or click any card to fold or unfold the people underneath.</li>
       <li><strong>Go back to overview</strong> — Tap the reset icon in the header to return to the full leadership map.</li>
