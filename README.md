@@ -46,12 +46,13 @@ CSV / `ORG_DATA` rows:
 | `importance` | Column required; value may be blank | `Y` shows an asterisk before the name |
 | `branch` | Optional column; value may be blank | Hiring-company alias from `alias.json` `branchKeys`. A mix is several aliases joined by `/`, such as `HK1/HK2`. A blank cell leaves the card white |
 | `function` | Optional column; value may be blank | Function alias from `alias.json` `functionKeys`. A mix is several aliases joined by `/`, such as `Business/Tech`. A blank cell keeps the thin gray border |
+| `workstream` | Optional column; value may be blank | Workstream alias from `alias.json` `workstreamKeys`. A mix is several aliases joined by `/`, such as `Retails/Commercials`. A blank cell leaves the branch fill unchanged |
 
-`data.js` always uses those canonical field names. Market CSV headers can differ. `alias.json` `columnKeys` supplies the real header for each field. Column order does not matter, and spaces around a header are ignored. Extra columns are ignored and are not written into `data.js`. Omit `columnKeys.branch` when the file has no hiring-alias column. Omit `columnKeys.function` when the file has no function column.
+`data.js` always uses those canonical field names. Market CSV headers can differ. `alias.json` `columnKeys` supplies the real header for each field. Column order does not matter, and spaces around a header are ignored. Extra columns are ignored and are not written into `data.js`. Omit `columnKeys.branch` when the file has no hiring-alias column. Omit `columnKeys.function` when the file has no function column. Omit `columnKeys.workstream` when the file has no workstream column.
 
 ## Alias file
 
-`columnKeys` maps fields to CSV headers. `locationKeys` maps a flag file name (no `.svg`) to the location text stored on each person. `branchKeys` maps an internal name to the hiring-alias text stored in the optional `branch` column. `branchColorKeys` lists card colors in the same order as `branchKeys`: the first branch uses the first color, the second branch the second color, and so on. `functionKeys` and `functionColorKeys` work the same way for the optional `function` column, and those colors are drawn as rings around the card. Branch fills are painted at 50% opacity. Function rings use the function opacity set in the chart. **Function border** on the chart switches how thick each ring is.
+`columnKeys` maps fields to CSV headers. `locationKeys` maps a flag file name (no `.svg`) to the location text stored on each person. `branchKeys` maps an internal name to the hiring-alias text stored in the optional `branch` column. `branchColorKeys` lists card colors in the same order as `branchKeys`: the first branch uses the first color, the second branch the second color, and so on. `functionKeys` and `functionColorKeys` work the same way for the optional `function` column, and those colors are drawn as rings around the card. `workstreamKeys` and `workstreamColorKeys` work the same way for the optional `workstream` column. Branch and workstream fills are painted at 50% opacity. When both branch and workstream are set on a person, the card fill is `color-mix(in oklch, branchColor, workstreamColor)` (multi-value cells become a gradient of those mixes). Function rings use the function opacity set in the chart. **Function border** on the chart switches how thick each ring is.
 
 Then open `prepare.html`, choose the CSV, and download a new `data.js`. If a mapped header is not in the file, the page names every missing column and does not offer a download. That check does not depend on column order. Conflicting priority numbers do not stop the download.
 
@@ -64,17 +65,20 @@ Prepare then checks every people row. It does not stop at the first bad person. 
 | `location` is blank or not a `locationKeys` value | Location is required on every person |
 | `branch` is set and a `/` part is not a `branchKeys` value | Blank branch cells are allowed |
 | `function` is set and a `/` part is not a `functionKeys` value | Blank function cells are allowed |
+| `workstream` is set and a `/` part is not a `workstreamKeys` value | Blank workstream cells are allowed |
 | `parentId` is a name shared by more than one person | Use that manager’s id |
 
 **Skip these rows and prepare data.js** drops only those lines, checks what remains, and then enables the download. The ready message includes how many rows were skipped. Completely empty lines are ignored and are not listed.
 
-Two file-level checks still block the download with no skip button. A missing mapped column is one. The other is `branchColorKeys` or `functionColorKeys` having fewer colors than the distinct branches or functions left in the file. Skipping bad people rows does not fix a missing column or a short color list.
+Two file-level checks still block the download with no skip button. A missing mapped column is one. The other is `branchColorKeys`, `functionColorKeys`, or `workstreamColorKeys` having fewer colors than the distinct branches, functions, or workstreams left in the file. Skipping bad people rows does not fix a missing column or a short color list.
 
 When `columnKeys.branch` is set, prepare also checks that column. Each non-blank cell is split on `/`. Every part must be a `branchKeys` value. The number of colors in `branchColorKeys` must be at least the number of distinct branches in the file. Three branches and three colors passes; three branches and two colors fails. People with a branch are filled with those colors at 50% opacity: one alias is a solid tint, two aliases split the card in half, three aliases take about a third each.
 
 When `columnKeys.function` is set, prepare checks that column the same way against `functionKeys` and `functionColorKeys`. A person with a function gets a ring in that color. A mix such as `Business/Tech` adds one ring per function. The first function is the outer ring. The card’s outer size stays the same. **Slice** gives every function its own ring at `SLICE_PX` (8px), so two functions are 16px thick and three are 24px. **Stack** uses the same rings at `STACK_PX` (4px) per function. A blank cell keeps the thin gray border. The choice is remembered in the browser.
 
-Downloading `data.js` also saves the alias that was used (`window.ALIAS`). The chart needs that copy: double-clicking `index.html` cannot read `alias.json`. Change `alias.json`, then download `data.js` again, before the legend names and card colors update offline. The legend prints each `branchKeys` and `functionKeys` value, in the same order as the color lists.
+When `columnKeys.workstream` is set, prepare checks that column the same way against `workstreamKeys` and `workstreamColorKeys`. A person with only a workstream gets that tint as the card fill. A person with both branch and workstream gets the OKLCH mix of those colors. Neither set leaves the card white (as before).
+
+Downloading `data.js` also saves the alias that was used (`window.ALIAS`). The chart needs that copy: double-clicking `index.html` cannot read `alias.json`. Change `alias.json`, then download `data.js` again, before the legend names and card colors update offline. The legend puts base `branchKeys`, `functionKeys`, and `workstreamKeys` on the first line as separate labelled grey boxes (`branch`, `function`, `workstream`), then starts `${branch} ${workstream}` mix dots on the next line for combinations that appear in the loaded data (max 9 mix items per line).
 
 ## How users open the chart
 

@@ -1,3 +1,3 @@
- region code ,function,notes,importance,branch,id,location,cost center,title, tree_priority ,name,parentId
-R0,Business,note 0,Y,,1,HK,"CC, 0",Chief Executive Officer,1,Sarah Jenkins,
-R1,Tech,note 1,Y,,2,UK,"CC, 1",Chief Technology Officer,0,Alex Rivera,Sarah Jenkins
+id,region code ,function,notes,importance,branch,workstream,location,cost center,title, tree_priority ,name,parentId
+0,R0,Business,note 0,Y,,1,HK,"CC, 0",Chief Executive Officer,Retails,Sarah Jenkins,
+1,R1,Tech,note 1,Y,,2,UK,"CC, 1",Chief Technology Officer,Commercials,Alex Rivera,Sarah Jenkins

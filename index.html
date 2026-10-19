@@ -483,7 +483,7 @@
       flex-direction: column;
       align-items: flex-end;
       justify-content: center;
-      gap: 2px;
+      gap: 4px;
       margin-left: auto;
       flex: 0 0 auto;
     }
@@ -494,6 +494,42 @@
       align-items: center;
       justify-content: flex-end;
       gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .legend-base {
+      gap: 6px;
+    }
+
+    .legend-group {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+      flex: 0 0 auto;
+      padding: 3px 8px 3px 6px;
+      background: rgba(148, 163, 184, 0.14);
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      border-radius: 6px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 1px 2px rgba(15, 23, 42, 0.06);
+    }
+
+    .legend-group-label {
+      flex: 0 0 auto;
+      font-size: 10px;
+      font-weight: 650;
+      letter-spacing: 0.02em;
+      text-transform: lowercase;
+      color: #64748b;
+      white-space: nowrap;
+    }
+
+    .legend-group-items {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+      flex: 0 0 auto;
     }
 
     .legend-item {
@@ -517,6 +553,25 @@
 
     #chart-container .node-foreign-object-div {
       font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .node-title {
+      display: inline-block;
+      width: auto;
+      max-width: 100%;
+      margin-top: 4px;
+      padding: 1px 6px;
+      font-size: 11px;
+      line-height: 1.2;
+      color: #0f172a;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      background: #e6d6d6;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      border-radius: 4px;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 1px 2px rgba(15, 23, 42, 0.08);
+      vertical-align: top;
     }
 
     #guidePanel {
@@ -622,10 +677,24 @@
       }
 
       .legend {
-        gap: 1px;
+        gap: 2px;
       }
 
       .legend-col { gap: 6px; }
+
+      .legend-base { gap: 4px; }
+
+      .legend-group {
+        gap: 5px;
+        padding: 2px 6px 2px 5px;
+        border-radius: 5px;
+      }
+
+      .legend-group-label {
+        font-size: 8px;
+      }
+
+      .legend-group-items { gap: 5px; }
 
       .legend-item {
         gap: 2px;

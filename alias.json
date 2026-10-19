@@ -8,7 +8,8 @@
     "location": "location",
     "importance": "importance",
     "branch": "branch",
-    "function": "function"
+    "function": "function",
+    "workstream": "workstream"
   },
   "locationKeys": {
     "hk": "HK",
@@ -25,7 +26,7 @@
   },
   "branchColorKeys": {
     "color1": "#FF7F7F",
-    "color2": "#98FB98",
+    "color2": "#669900",
     "color3": "#87CEFA",
     "color4": "#D8BFD8"
   },
@@ -39,5 +40,16 @@
     "color2": "#6600CC",
     "color3": "#6699FF",
     "color4": "#7E22CE"
+  },
+  "workstreamKeys": {
+    "workRetails": "Retails",
+    "workCommercials": "Commercials",
+    "workInvestments": "Investments"
+  },
+  "workstreamColorKeys": {
+    "color1": "lightGrey",
+    "color2": "lightBlue",
+    "color3": "lightGreen",
+    "color4": "lightOrange"
   }
 }

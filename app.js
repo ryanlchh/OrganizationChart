@@ -2,9 +2,11 @@
   const INITIAL_EXPAND_LEVEL = 2; // CEO(0) → VP(1) → Director(2)
   const FOREST_ID = "__all_trees__";
   const CSV_URL = "./hr_org.csv";
-  const BRANCH_OPACITY = 0.5;
-  const FUNCTION_OPACITY = 0.5;
+  const LEGEND_PER_LINE = 9;
   const FUNCTION_MARK_DEFAULT = "stack"; // or "slice"
+  const FUNCTION_OPACITY = 0.5;
+  const BRANCH_OPACITY = 0.5;
+  const WORKSTREAM_OPACITY = 0.5;
   const SLICE_PX = 8;
   const STACK_PX = 4;
   const CARD_RADIUS = 8;
@@ -19,6 +21,7 @@
       importance: "importance",
       branch: "branch",
       function: "function",
+      workstream: "workstream",
     },
     locationKeys: {
       hk: "HK",
@@ -49,6 +52,16 @@
       color2: "#1D4ED8",
       color3: "#15803D",
       color4: "#7E22CE",
+    },
+    workstreamKeys: {
+      workRetails: "Retails",
+      workCommercials: "Commercials",
+      workInvestments: "Investments",
+    },
+    workstreamColorKeys: {
+      color1: "grey",
+      color2: "blue",
+      color3: "yellow",
     },
   };
 
@@ -131,6 +144,7 @@
           importance: String(d.importance || "").trim(),
           branch: String(d.branch || "").trim(),
           function: String(d.function || "").trim(),
+          workstream: String(d.workstream || "").trim(),
         };
       });
   }
@@ -169,6 +183,7 @@
     });
     if (String(source.branch || "").trim()) map.branch = String(source.branch).trim();
     if (String(source.function || "").trim()) map.function = String(source.function).trim();
+    if (String(source.workstream || "").trim()) map.workstream = String(source.workstream).trim();
     return map;
   }
 
@@ -198,13 +213,14 @@
     };
     if (map.branch) row.branch = blankToEmpty(csvCell(data, map.branch));
     if (map.function) row.function = blankToEmpty(csvCell(data, map.function));
+    if (map.workstream) row.workstream = blankToEmpty(csvCell(data, map.workstream));
     return row;
   }
 
   function isBlankPerson(row) {
     return !row.id && !row.name && !row.title && !row.parentId &&
       !row.treePriority && !row.location && !row.importance &&
-      !row.branch && !row.function;
+      !row.branch && !row.function && !row.workstream;
   }
 
   function tokenReason(raw, allowedSet, allowedList, fieldLabel) {
@@ -236,13 +252,16 @@
     const seen = distinctLabels(rows, field, new Set(allowed));
     const colorCount = Object.keys((window.ALIAS && window.ALIAS[colorName]) || {}).length;
     if (colorCount >= seen.size) return "";
-    const plural = field === "branch"
-      ? (seen.size === 1 ? "branch" : "branches")
-      : (seen.size === 1 ? "function" : "functions");
-    const group = field === "branch" ? "branches" : "functions";
+    const plurals = {
+      branch: { one: "branch", many: "branches", group: "branches" },
+      function: { one: "function", many: "functions", group: "functions" },
+      workstream: { one: "workstream", many: "workstreams", group: "workstreams" },
+    };
+    const words = plurals[field] || { one: field, many: field + "s", group: field + "s" };
+    const plural = seen.size === 1 ? words.one : words.many;
     return colorName + " has " + colorCount + " color" + (colorCount === 1 ? "" : "s") +
       " but the " + field + " column has " + seen.size + " distinct " + plural +
-      ". Need at least as many colors as " + group + ".";
+      ". Need at least as many colors as " + words.group + ".";
   }
 
   function rowProblems(rows, map) {
@@ -262,6 +281,7 @@
     const knownLocations = Array.from(allowedLocations);
     const allowedBranches = Object.values((window.ALIAS && window.ALIAS.branchKeys) || {});
     const allowedFunctions = Object.values((window.ALIAS && window.ALIAS.functionKeys) || {});
+    const allowedWorkstreams = Object.values((window.ALIAS && window.ALIAS.workstreamKeys) || {});
 
     return rows.map((row) => {
       const reasons = [];
@@ -280,6 +300,15 @@
       if (map.function) {
         const functionReason = tokenReason(row.function, new Set(allowedFunctions), allowedFunctions, "function");
         if (functionReason) reasons.push(functionReason);
+      }
+      if (map.workstream) {
+        const workstreamReason = tokenReason(
+          row.workstream,
+          new Set(allowedWorkstreams),
+          allowedWorkstreams,
+          "workstream"
+        );
+        if (workstreamReason) reasons.push(workstreamReason);
       }
       const parent = row.parentId.trim();
       if (parent && !ids.has(parent)) {
@@ -307,6 +336,7 @@
         importance: row.importance,
         branch: row.branch || "",
         function: row.function || "",
+        workstream: row.workstream || "",
       };
       return copy;
     });
@@ -460,27 +490,66 @@
     return raw;
   }
 
-  function branchFill(value) {
-    const tokens = String(value || "")
+  function splitTokens(value) {
+    return String(value || "")
       .split("/")
       .map((part) => part.trim())
       .filter(Boolean);
-    if (!tokens.length) return "#fff";
-    const branches = Object.values((window.ALIAS && window.ALIAS.branchKeys) || {});
-    const colors = Object.values((window.ALIAS && window.ALIAS.branchColorKeys) || {});
+  }
+
+  function keyColorEntries(value, keysName, colorName, opacity) {
+    const tokens = splitTokens(value);
+    if (!tokens.length) return [];
+    const names = Object.values((window.ALIAS && window.ALIAS[keysName]) || {});
+    const colors = Object.values((window.ALIAS && window.ALIAS[colorName]) || {});
     const picked = [];
     for (const token of tokens) {
-      const index = branches.indexOf(token);
-      if (index < 0 || !colors[index]) return "#fff";
-      picked.push(withOpacity(colors[index], BRANCH_OPACITY));
+      const index = names.indexOf(token);
+      if (index < 0 || !colors[index]) return null;
+      const solid = String(colors[index]).trim();
+      picked.push({
+        name: token,
+        color: opacity < 1 ? withOpacity(solid, opacity) : solid,
+      });
     }
-    if (picked.length === 1) return picked[0];
-    const stops = picked.map((color, index) => {
-      const start = (100 * index) / picked.length;
-      const end = (100 * (index + 1)) / picked.length;
+    return picked;
+  }
+
+  function gradientFill(colors) {
+    if (!colors.length) return "#fff";
+    if (colors.length === 1) return colors[0];
+    const stops = colors.map((color, index) => {
+      const start = (100 * index) / colors.length;
+      const end = (100 * (index + 1)) / colors.length;
       return color + " " + start + "% " + end + "%";
     });
     return "linear-gradient(to right, " + stops.join(", ") + ")";
+  }
+
+  function mixOkLch(a, b) {
+    return "color-mix(in oklch, " + a + ", " + b + ")";
+  }
+
+  /* Mixes branch key color (if specified) + workstream key color (if specified). */
+  function cardFill(branchValue, workstreamValue) {
+    const branches = keyColorEntries(branchValue, "branchKeys", "branchColorKeys", BRANCH_OPACITY);
+    const streams = keyColorEntries(
+      workstreamValue,
+      "workstreamKeys",
+      "workstreamColorKeys",
+      WORKSTREAM_OPACITY
+    );
+    if (branches === null || streams === null) return "#fff";
+    if (!branches.length && !streams.length) return "#fff";
+    if (!streams.length) return gradientFill(branches.map((item) => item.color));
+    if (!branches.length) return gradientFill(streams.map((item) => item.color));
+    const mixed = [];
+    branches.forEach((branch) => {
+      streams.forEach((stream) => {
+        mixed.push(mixOkLch(branch.color, stream.color));
+      });
+    });
+    return gradientFill(mixed);
   }
 
   function functionLayerPx() {
@@ -521,25 +590,81 @@
     return items;
   }
 
-  function renderLegend() {
+  function mixLegendPairs(rows) {
+    const alias = window.ALIAS || {};
+    const branchNames = Object.values(alias.branchKeys || {});
+    const branchColors = Object.values(alias.branchColorKeys || {});
+    const streamNames = Object.values(alias.workstreamKeys || {});
+    const streamColors = Object.values(alias.workstreamColorKeys || {});
+    const seen = new Map();
+    (rows || []).forEach((row) => {
+      const branches = splitTokens(row.branch);
+      const streams = splitTokens(row.workstream);
+      if (!branches.length || !streams.length) return;
+      branches.forEach((branchName) => {
+        streams.forEach((streamName) => {
+          const key = branchName + "\0" + streamName;
+          if (seen.has(key)) return;
+          const bi = branchNames.indexOf(branchName);
+          const si = streamNames.indexOf(streamName);
+          if (bi < 0 || si < 0 || !branchColors[bi] || !streamColors[si]) return;
+          seen.set(key, {
+            name: branchName + " " + streamName,
+            color: mixOkLch(
+              withOpacity(branchColors[bi], BRANCH_OPACITY),
+              withOpacity(streamColors[si], WORKSTREAM_OPACITY)
+            ),
+          });
+        });
+      });
+    });
+    return Array.from(seen.values());
+  }
+
+  function legendItemHtml(item) {
+    return (
+      `<span class="legend-item"><span class="legend-dot" style="background:${esc(item.color)}"></span>` +
+      `<span>${esc(item.name)}</span></span>`
+    );
+  }
+
+  function legendGroupHtml(label, items) {
+    if (!items.length) return "";
+    return (
+      `<div class="legend-group">` +
+      `<span class="legend-group-label">${esc(label)}</span>` +
+      `<span class="legend-group-items">${items.map(legendItemHtml).join("")}</span>` +
+      `</div>`
+    );
+  }
+
+  function legendLinesHtml(items) {
+    const lines = [];
+    for (let i = 0; i < items.length; i += LEGEND_PER_LINE) {
+      lines.push(items.slice(i, i + LEGEND_PER_LINE));
+    }
+    return lines
+      .map((line) => `<div class="legend-col">${line.map(legendItemHtml).join("")}</div>`)
+      .join("");
+  }
+
+  function renderLegend(rows) {
     const el = document.getElementById("legend");
     if (!el) return;
     const alias = window.ALIAS || {};
-    const groups = [
-      legendPairs(alias.branchKeys, alias.branchColorKeys, BRANCH_OPACITY),
-      legendPairs(alias.functionKeys, alias.functionColorKeys, FUNCTION_OPACITY),
-    ].filter((group) => group.length);
-    el.innerHTML = groups
-      .map((group) => {
-        const rows = group
-          .map(
-            (item) =>
-              `<span class="legend-item"><span class="legend-dot" style="background:${esc(item.color)}"></span><span>${esc(item.name)}</span></span>`
-          )
-          .join("");
-        return `<div class="legend-col">${rows}</div>`;
-      })
-      .join("");
+    const people = rows || rawData || [];
+    const baseGroups = [
+      { label: "branch", items: legendPairs(alias.branchKeys, alias.branchColorKeys, BRANCH_OPACITY) },
+      { label: "function", items: legendPairs(alias.functionKeys, alias.functionColorKeys, FUNCTION_OPACITY) },
+      { label: "workstream", items: legendPairs(alias.workstreamKeys, alias.workstreamColorKeys, WORKSTREAM_OPACITY) },
+    ].filter((group) => group.items.length);
+    const baseHtml = baseGroups.length
+      ? `<div class="legend-col legend-base">${baseGroups
+          .map((group) => legendGroupHtml(group.label, group.items))
+          .join("")}</div>`
+      : "";
+    const mixItems = mixLegendPairs(people);
+    el.innerHTML = baseHtml + legendLinesHtml(mixItems);
   }
 
   function flagFile(location) {
@@ -558,7 +683,7 @@
     const shortTitle = title.length > 26 ? `${title.slice(0, 24)}…` : title;
     const important = String(d.data.importance || "").trim().toUpperCase() === "Y";
     const flag = flagFile(d.data.location);
-    const cardFill = branchFill(d.data.branch);
+    const fill = cardFill(d.data.branch, d.data.workstream);
     const borderColors = functionColors(d.data.function);
     const mark = important
       ? `<span title="Important" style="flex:0 0 auto;margin-right:4px;color:#7ec8e3;font-weight:700;line-height:1;">*</span>`
@@ -575,7 +700,7 @@
           <div style="display:flex;align-items:center;font-size:13px;font-weight:700;color:#1e293b;line-height:1.2;">
             ${mark}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(shortName)}</span>
           </div>
-          <div style="font-size:11px;color:#64748b;margin-top:4px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(shortTitle)}</div>
+          <div class="node-title">${esc(shortTitle)}</div>
         </div>`;
     if (!borderColors.length) {
       return `
@@ -583,7 +708,7 @@
         width:${d.width}px;
         height:${d.height}px;
         padding:8px 10px 8px 8px;
-        background:${cardFill};
+        background:${fill};
         border:2px solid #cbd5e1;
         border-radius:${CARD_RADIUS}px;
         display:flex;
@@ -601,7 +726,7 @@
         width:100%;
         height:100%;
         padding:8px 10px 8px 8px;
-        background:${cardFill};
+        background:${fill};
         border-radius:${Math.max(0, CARD_RADIUS - total)}px;
         display:flex;
         align-items:center;
@@ -658,6 +783,7 @@
 
     if (!options || !options.keepStatus) hideStatus();
     populateDirectorDropdown(rawData);
+    renderLegend(rawData);
 
     document.getElementById("chart-container").innerHTML = "";
 
@@ -840,6 +966,7 @@
     const required = ["id", "name", "title", "parentId", "treePriority", "location", "importance"];
     if (map.branch) required.push("branch");
     if (map.function) required.push("function");
+    if (map.workstream) required.push("workstream");
     const missing = required.filter((key) => !map[key] || !trimmed.includes(map[key]));
     if (missing.length) {
       const detail = missing.map((key) => '"' + (map[key] || key) + '" (needed for ' + key + ")").join(", ");
@@ -870,6 +997,18 @@
       const functionColors = colorCountReason(rows, "function", "functionKeys", "functionColorKeys");
       if (functionColors) {
         showStatus(functionColors, true);
+        return;
+      }
+    }
+    if (map.workstream) {
+      const workstreamColors = colorCountReason(
+        rows,
+        "workstream",
+        "workstreamKeys",
+        "workstreamColorKeys"
+      );
+      if (workstreamColors) {
+        showStatus(workstreamColors, true);
         return;
       }
     }
@@ -1011,6 +1150,18 @@
         const functionColors = colorCountReason(kept, "function", "functionKeys", "functionColorKeys");
         if (functionColors) {
           showStatus(functionColors, true);
+          return;
+        }
+      }
+      if (map.workstream) {
+        const workstreamColors = colorCountReason(
+          kept,
+          "workstream",
+          "workstreamKeys",
+          "workstreamColorKeys"
+        );
+        if (workstreamColors) {
+          showStatus(workstreamColors, true);
           return;
         }
       }
