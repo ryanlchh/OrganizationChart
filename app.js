@@ -39,6 +39,7 @@
           location: String(d.location || "").trim(),
           importance: String(d.importance || "").trim(),
           branch: String(d.branch || "").trim(),
+          function: String(d.function || "").trim(),
         };
       });
   }
@@ -182,6 +183,27 @@
     }[ch]));
   }
 
+  const COLOR_OPACITY = 0.5;
+
+  function withOpacity(color, alpha) {
+    const raw = String(color || "").trim();
+    if (!raw) return raw;
+    const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(raw);
+    if (hex) {
+      let h = hex[1];
+      if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+      const r = parseInt(h.slice(0, 2), 16);
+      const g = parseInt(h.slice(2, 4), 16);
+      const b = parseInt(h.slice(4, 6), 16);
+      return "rgba(" + r + ", " + g + ", " + b + ", " + alpha + ")";
+    }
+    const rgb = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*[\d.]+\s*)?\)$/i.exec(raw);
+    if (rgb) {
+      return "rgba(" + rgb[1] + ", " + rgb[2] + ", " + rgb[3] + ", " + alpha + ")";
+    }
+    return raw;
+  }
+
   function branchFill(value) {
     const tokens = String(value || "")
       .split("/")
@@ -189,12 +211,12 @@
       .filter(Boolean);
     if (!tokens.length) return "#fff";
     const branches = Object.values((window.ALIAS && window.ALIAS.branchKeys) || {});
-    const colors = Object.values((window.ALIAS && window.ALIAS.hexColorKeys) || {});
+    const colors = Object.values((window.ALIAS && window.ALIAS.branchColorKeys) || {});
     const picked = [];
     for (const token of tokens) {
       const index = branches.indexOf(token);
       if (index < 0 || !colors[index]) return "#fff";
-      picked.push(colors[index]);
+      picked.push(withOpacity(colors[index], COLOR_OPACITY));
     }
     if (picked.length === 1) return picked[0];
     const stops = picked.map((color, index) => {
@@ -203,6 +225,36 @@
       return color + " " + start + "% " + end + "%";
     });
     return "linear-gradient(to right, " + stops.join(", ") + ")";
+  }
+
+  const FUNCTION_BAR = 10;
+  const CARD_RADIUS = 8;
+
+  function functionColors(value) {
+    const tokens = String(value || "")
+      .split("/")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (!tokens.length) return [];
+    const names = Object.values((window.ALIAS && window.ALIAS.functionKeys) || {});
+    const colors = Object.values((window.ALIAS && window.ALIAS.functionColorKeys) || {});
+    const picked = [];
+    for (const token of tokens) {
+      const index = names.indexOf(token);
+      if (index < 0 || !colors[index]) return [];
+      picked.push(colors[index]);
+    }
+    return picked;
+  }
+
+  function functionBarFill(colors) {
+    if (colors.length <= 1) return colors[0] || "transparent";
+    const stops = colors.map((color, index) => {
+      const start = (100 * index) / colors.length;
+      const end = (100 * (index + 1)) / colors.length;
+      return color + " " + start + "% " + end + "%";
+    });
+    return "linear-gradient(to bottom, " + stops.join(", ") + ")";
   }
 
   function flagFile(location) {
@@ -222,25 +274,14 @@
     const important = String(d.data.importance || "").trim().toUpperCase() === "Y";
     const flag = flagFile(d.data.location);
     const cardFill = branchFill(d.data.branch);
+    const borderColors = functionColors(d.data.function);
     const mark = important
       ? `<span title="Important" style="flex:0 0 auto;margin-right:4px;color:#7ec8e3;font-weight:700;line-height:1;">*</span>`
       : "";
     const flagHtml = flag
       ? `<div style="width:28px;height:28px;border-radius:50%;background:#f4f6f8;border:1px solid #e5e7eb;display:flex;align-items:center;justify-content:center;flex:0 0 auto;"><img src="${esc(flag)}" alt="${esc(d.data.location)}" style="width:18px;height:12px;object-fit:contain;display:block;" /></div>`
       : "";
-    return `
-      <div style="
-        width:${d.width}px;
-        height:${d.height}px;
-        padding:8px 10px 8px 8px;
-        background:${cardFill};
-        border:2px solid #cbd5e1;
-        border-radius:8px;
-        display:flex;
-        align-items:center;
-        gap:8px;
-        box-sizing:border-box;
-      ">
+    const body = `
         <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:28px;flex:0 0 auto;">
           ${flagHtml}
           <div class="location-indicators" style="display:flex;flex-direction:column;align-items:center;gap:3px;min-height:8px;"></div>
@@ -250,6 +291,23 @@
             ${mark}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(shortName)}</span>
           </div>
           <div style="font-size:11px;color:#64748b;margin-top:4px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(shortTitle)}</div>
+        </div>`;
+    const bar = borderColors.length
+      ? `<div style="width:${FUNCTION_BAR}px;flex:0 0 ${FUNCTION_BAR}px;align-self:stretch;background:${functionBarFill(borderColors)};"></div>`
+      : "";
+    return `
+      <div style="
+        width:${d.width}px;
+        height:${d.height}px;
+        background:${cardFill};
+        border:${borderColors.length ? "0" : "2px solid #cbd5e1"};
+        border-radius:${CARD_RADIUS}px;
+        display:flex;
+        align-items:stretch;
+        overflow:hidden;
+        box-sizing:border-box;
+      ">${bar}
+        <div style="min-width:0;flex:1 1 auto;display:flex;align-items:center;gap:8px;padding:8px 10px 8px 8px;">${body}
         </div>
       </div>
     `;
@@ -472,6 +530,7 @@
       location: "location",
       importance: "importance",
       branch: "branch",
+      function: "function",
     },
     locationKeys: {
       hk: "HK",
@@ -486,11 +545,22 @@
       branch2: "HK2",
       branch3: "UK1",
     },
-    hexColorKeys: {
+    branchColorKeys: {
       color1: "#FF7F7F",
       color2: "#98FB98",
       color3: "#87CEFA",
       color4: "#D8BFD8",
+    },
+    functionKeys: {
+      function1: "function1",
+      function2: "function2",
+      function3: "function3",
+    },
+    functionColorKeys: {
+      color1: "#C2410C",
+      color2: "#1D4ED8",
+      color3: "#15803D",
+      color4: "#7E22CE",
     },
   };
 

@@ -44,50 +44,19 @@ CSV / `ORG_DATA` rows:
 | `location` | Yes, every person | One of the values in `alias.json` `locationKeys`. The key is the flag file name in `assets` without `.svg` |
 | `importance` | Column required; value may be blank | `Y` shows an asterisk before the name |
 | `branch` | Optional column; value may be blank | Hiring-company alias from `alias.json` `branchKeys`. A mix is several aliases joined by `/`, such as `HK1/HK2`. A blank cell leaves the card white |
+| `function` | Optional column; value may be blank | Function alias from `alias.json` `functionKeys`. A mix is several aliases joined by ` / `, such as `function1 / function2`. A blank cell keeps the thin gray border and no left bar |
 
-`data.js` always uses those canonical field names. Market CSV headers can differ. `alias.json` `columnKeys` supplies the real header for each field. Column order does not matter. Omit `columnKeys.branch` when the file has no hiring-alias column.
+`data.js` always uses those canonical field names. Market CSV headers can differ. `alias.json` `columnKeys` supplies the real header for each field. Column order does not matter. Omit `columnKeys.branch` when the file has no hiring-alias column. Omit `columnKeys.function` when the file has no function column.
 
 ## Alias file
 
-Edit `alias.json` only. `columnKeys` maps fields to CSV headers. `locationKeys` maps a flag file name (no `.svg`) to the location text stored on each person. `branchKeys` maps an internal name to the hiring-alias text stored in the optional `branch` column. `hexColorKeys` lists card colors in the same order as `branchKeys`: the first branch uses the first color, the second branch the second color, and so on.
-
-```json
-{
-  "columnKeys": {
-    "id": "id",
-    "name": "name",
-    "title": "title",
-    "parentId": "parentId",
-    "treePriority": "tree_priority",
-    "location": "location",
-    "importance": "importance",
-    "branch": "branch"
-  },
-  "locationKeys": {
-    "hk": "HK",
-    "in": "India",
-    "cn": "Mainland China",
-    "pl": "Poland",
-    "gb": "UK",
-    "us": "US"
-  },
-  "branchKeys": {
-    "branch1": "HK1",
-    "branch2": "HK2",
-    "branch3": "UK1"
-  },
-  "hexColorKeys": {
-    "color1": "#FF7F7F",
-    "color2": "#98FB98",
-    "color3": "#87CEFA",
-    "color4": "#D8BFD8"
-  }
-}
-```
+`columnKeys` maps fields to CSV headers. `locationKeys` maps a flag file name (no `.svg`) to the location text stored on each person. `branchKeys` maps an internal name to the hiring-alias text stored in the optional `branch` column. `branchColorKeys` lists card colors in the same order as `branchKeys`: the first branch uses the first color, the second branch the second color, and so on. `functionKeys` and `functionColorKeys` work the same way for the optional `function` column, and those colors are drawn as a bar on the left of the card. Branch fills are painted at 50% opacity so text stays readable. The function bar is full opacity so it stays visible when the chart is zoomed out.
 
 Then open `prepare.html`, choose the CSV, and download a new `data.js`. If a mapped header is not in the file, the page stops and names the missing column. Conflicting priority numbers do not stop the download.
 
-When `columnKeys.branch` is set, prepare also checks that column. Each non-blank cell is split on `/`. Every part must be a `branchKeys` value. The number of colors in `hexColorKeys` must be greater than the number of distinct branches in the file. Three branches and three colors fails; three branches and four colors passes. People with a branch are filled with those colors: one alias is a solid color, two aliases split the card in half, three aliases take about a third each.
+When `columnKeys.branch` is set, prepare also checks that column. Each non-blank cell is split on `/`. Every part must be a `branchKeys` value. The number of colors in `branchColorKeys` must be at least the number of distinct branches in the file. Three branches and three colors passes; three branches and two colors fails. People with a branch are filled with those colors at 50% opacity: one alias is a solid tint, two aliases split the card in half, three aliases take about a third each.
+
+When `columnKeys.function` is set, prepare checks that column the same way against `functionKeys` and `functionColorKeys`. A person with a function gets a 10px bar on the left of the card in that color at full opacity. A mix such as `function1 / function2` keeps that same 10px width and splits it into equal blocks stacked top to bottom, one color per function, so every card stays the same size. The first function is the top block. A blank cell keeps the thin gray border and no bar.
 
 ## How users open the chart
 

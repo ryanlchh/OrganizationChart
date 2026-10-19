@@ -260,11 +260,15 @@
       });
       const branchHeader = map.branch == null ? "" : String(map.branch).trim();
       if (branchHeader) columnMap.branch = branchHeader;
+      const functionHeader = map.function == null ? "" : String(map.function).trim();
+      if (functionHeader) columnMap.function = functionHeader;
       window.ALIAS = {
         columnKeys: columnMap,
         locationKeys: locations,
         branchKeys: alias.branchKeys && typeof alias.branchKeys === "object" ? alias.branchKeys : {},
-        hexColorKeys: alias.hexColorKeys && typeof alias.hexColorKeys === "object" ? alias.hexColorKeys : {},
+        branchColorKeys: alias.branchColorKeys && typeof alias.branchColorKeys === "object" ? alias.branchColorKeys : {},
+        functionKeys: alias.functionKeys && typeof alias.functionKeys === "object" ? alias.functionKeys : {},
+        functionColorKeys: alias.functionColorKeys && typeof alias.functionColorKeys === "object" ? alias.functionColorKeys : {},
       };
       setMapStatus("Using mapping from " + sourceLabel + ".");
       return true;
@@ -323,6 +327,10 @@
             const branch = String(cell(d, map.branch) || "").trim();
             row.branch = branch.toLowerCase() === "null" ? "" : branch;
           }
+          if (map.function) {
+            const job = String(cell(d, map.function) || "").trim();
+            row.function = job.toLowerCase() === "null" ? "" : job;
+          }
           return row;
         });
     }
@@ -344,6 +352,7 @@
       const trimmed = columns.map((name) => String(name).trim());
       const requiredHeaders = MAP_KEYS.slice();
       if (columnMap.branch) requiredHeaders.push("branch");
+      if (columnMap.function) requiredHeaders.push("function");
       const missing = requiredHeaders.filter((key) => !trimmed.includes(columnMap[key]));
       if (missing.length) {
         const detail = missing
@@ -394,13 +403,49 @@
             seenBranches.add(label);
           }
         }
-        const colorCount = Object.keys((window.ALIAS && window.ALIAS.hexColorKeys) || {}).length;
-        if (colorCount <= seenBranches.size) {
+        const colorCount = Object.keys((window.ALIAS && window.ALIAS.branchColorKeys) || {}).length;
+        if (colorCount < seenBranches.size) {
           setMessage(
-            "hexColorKeys has " + colorCount + " color" + (colorCount === 1 ? "" : "s") +
+            "branchColorKeys has " + colorCount + " color" + (colorCount === 1 ? "" : "s") +
               " but the branch column has " + seenBranches.size + " distinct branch" +
               (seenBranches.size === 1 ? "" : "es") +
-              ". Need more colors than branches.",
+              ". Need at least as many colors as branches.",
+            true
+          );
+          return;
+        }
+      }
+
+      if (columnMap.function) {
+        const allowedFunctions = Object.values((window.ALIAS && window.ALIAS.functionKeys) || {});
+        const allowedFunctionSet = new Set(allowedFunctions);
+        const seenFunctions = new Set();
+        for (const row of rows) {
+          const raw = String(row.function || "").trim();
+          if (!raw) continue;
+          const tokens = raw.split("/");
+          for (const token of tokens) {
+            const label = token.trim();
+            if (!label || !allowedFunctionSet.has(label)) {
+              const known = allowedFunctions.join(", ");
+              setMessage(
+                'Person ' + row.id + ' has function "' + raw +
+                  '". Each part must be a functionKeys value' +
+                  (known ? ': ' + known : '') + '.',
+                true
+              );
+              return;
+            }
+            seenFunctions.add(label);
+          }
+        }
+        const colorCount = Object.keys((window.ALIAS && window.ALIAS.functionColorKeys) || {}).length;
+        if (colorCount < seenFunctions.size) {
+          setMessage(
+            "functionColorKeys has " + colorCount + " color" + (colorCount === 1 ? "" : "s") +
+              " but the function column has " + seenFunctions.size + " distinct function" +
+              (seenFunctions.size === 1 ? "" : "s") +
+              ". Need at least as many colors as functions.",
             true
           );
           return;
