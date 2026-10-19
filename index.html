@@ -537,10 +537,43 @@
       align-items: center;
       gap: 4px;
       flex: 0 0 auto;
+      margin: 0;
+      padding: 1px 2px;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      background: transparent;
+      font: inherit;
       font-size: 11px;
       line-height: 1.15;
       color: #333;
       white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .legend-item.is-on {
+      border-color: #64748b;
+      background: rgba(255, 255, 255, 0.72);
+    }
+
+    .legend-item.is-dim {
+      opacity: 0.35;
+    }
+
+    .legend-multi {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex: 0 0 auto;
+      font-size: 11px;
+      color: #334155;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .legend-multi input {
+      margin: 0;
+      cursor: pointer;
     }
 
     .legend-dot {
@@ -726,6 +759,8 @@
         line-height: 1.1;
       }
 
+      .legend-multi { font-size: 9px; }
+
       .legend-dot {
         width: 6px;
         height: 6px;
@@ -818,6 +853,7 @@
       <li><strong>Hide or show a team</strong> — Tap or click any card to fold or unfold the people underneath.</li>
       <li><strong>Go back to overview</strong> — Tap the reset icon in the header to return to the full leadership map.</li>
       <li><strong>Projects</strong> — Dots under the role follow the project list. A colored dot means that person is on the project. A light grey dot means they are not. The footer groups those colors under <em>project</em>.</li>
+      <li><strong>Filter from the legend</strong> — Click a legend to fade people who do not match. Their card drops to a faint tint and the name turns grey. The reporting lines stay in place. Click the legend again to clear. Turn on <em>Multi-select</em> to keep several legends at once. A person matches if any selected legend applies.</li>
     </ol>
     <p class="tip">
       Open this page in your browser (double-click <code>index.html</code>).
@@ -860,6 +896,10 @@
       </button>
       <div class="mark">Internal use only</div>
     </div>
+    <label class="legend-multi" for="legendMulti">
+      <input type="checkbox" id="legendMulti" />
+      Multi-select
+    </label>
     <div id="legend" class="legend" aria-label="Color legend"></div>
   </footer>
 

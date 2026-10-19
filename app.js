@@ -81,6 +81,8 @@
   let rawData = [];
   let functionMark = FUNCTION_MARK_DEFAULT;
   let pendingLoad = null;
+  let legendMulti = false;
+  let legendSelected = [];
 
   const statusEl = document.getElementById("status");
   const statusText = document.getElementById("statusText");
@@ -634,7 +636,7 @@
     return picked;
   }
 
-  function legendPairs(nameMap, colorMap, opacity) {
+  function legendPairs(nameMap, colorMap, opacity, kind) {
     const names = Object.values(nameMap || {});
     const colors = Object.values(colorMap || {});
     const count = Math.min(names.length, colors.length);
@@ -644,6 +646,7 @@
       const color = String(colors[i] || "").trim();
       if (!name || !color) continue;
       items.push({
+        kind: kind,
         name,
         color: opacity < 1 ? withOpacity(color, opacity) : color,
       });
@@ -670,7 +673,10 @@
           const si = streamNames.indexOf(streamName);
           if (bi < 0 || si < 0 || !branchColors[bi] || !streamColors[si]) return;
           seen.set(key, {
+            kind: "mix",
             name: branchName + " " + streamName,
+            branch: branchName,
+            stream: streamName,
             color: mixOkLch(
               withOpacity(branchColors[bi], BRANCH_OPACITY),
               withOpacity(streamColors[si], WORKSTREAM_OPACITY)
@@ -682,11 +688,66 @@
     return Array.from(seen.values());
   }
 
+  function legendKey(entry) {
+    return String(entry.kind || "") + "\0" + String(entry.name || "");
+  }
+
   function legendItemHtml(item) {
+    const on = legendSelected.some((entry) => legendKey(entry) === legendKey(item));
+    const dim = legendSelected.length > 0 && !on;
+    const cls = "legend-item" + (on ? " is-on" : "") + (dim ? " is-dim" : "");
+    const branchAttr = item.branch ? ` data-branch="${esc(item.branch)}"` : "";
+    const streamAttr = item.stream ? ` data-stream="${esc(item.stream)}"` : "";
     return (
-      `<span class="legend-item"><span class="legend-dot" style="background:${esc(item.color)}"></span>` +
-      `<span>${esc(item.name)}</span></span>`
+      `<button type="button" class="${cls}" data-kind="${esc(item.kind)}" data-name="${esc(item.name)}"` +
+      branchAttr + streamAttr + ` aria-pressed="${on ? "true" : "false"}">` +
+      `<span class="legend-dot" style="background:${esc(item.color)}"></span>` +
+      `<span>${esc(item.name)}</span></button>`
     );
+  }
+
+  function personMatchesLegend(row, entry) {
+    if (!row || !entry) return false;
+    if (entry.kind === "branch") return splitTokens(row.branch).includes(entry.name);
+    if (entry.kind === "function") return splitTokens(row.function).includes(entry.name);
+    if (entry.kind === "workstream") return splitTokens(row.workstream).includes(entry.name);
+    if (entry.kind === "project") {
+      const col = projectColumns().find((item) => item.header === entry.name);
+      if (!col) return false;
+      return String((row.projects && row.projects[col.key]) || "").trim().toUpperCase() === "Y";
+    }
+    if (entry.kind === "mix") {
+      return splitTokens(row.branch).includes(entry.branch) &&
+        splitTokens(row.workstream).includes(entry.stream);
+    }
+    return false;
+  }
+
+  function personMatchesAny(row) {
+    return legendSelected.some((entry) => personMatchesLegend(row, entry));
+  }
+
+  function refreshLegendChart() {
+    renderLegend(rawData);
+    if (chart) chart.render();
+  }
+
+  function toggleLegend(button) {
+    const entry = {
+      kind: button.dataset.kind || "",
+      name: button.dataset.name || "",
+      branch: button.dataset.branch || "",
+      stream: button.dataset.stream || "",
+    };
+    const index = legendSelected.findIndex((item) => legendKey(item) === legendKey(entry));
+    if (!legendMulti) {
+      legendSelected = index >= 0 && legendSelected.length === 1 ? [] : [entry];
+    } else if (index >= 0) {
+      legendSelected.splice(index, 1);
+    } else {
+      legendSelected.push(entry);
+    }
+    refreshLegendChart();
   }
 
   function legendGroupHtml(label, items) {
@@ -715,10 +776,10 @@
     const alias = window.ALIAS || {};
     const people = rows || rawData || [];
     const baseGroups = [
-      { label: "branch", items: legendPairs(alias.branchKeys, alias.branchColorKeys, BRANCH_OPACITY) },
-      { label: "function", items: legendPairs(alias.functionKeys, alias.functionColorKeys, FUNCTION_OPACITY) },
-      { label: "workstream", items: legendPairs(alias.workstreamKeys, alias.workstreamColorKeys, WORKSTREAM_OPACITY) },
-      { label: "project", items: legendPairs(alias.projectKeys, alias.projectColorKeys, 1) },
+      { label: "branch", items: legendPairs(alias.branchKeys, alias.branchColorKeys, BRANCH_OPACITY, "branch") },
+      { label: "function", items: legendPairs(alias.functionKeys, alias.functionColorKeys, FUNCTION_OPACITY, "function") },
+      { label: "workstream", items: legendPairs(alias.workstreamKeys, alias.workstreamColorKeys, WORKSTREAM_OPACITY, "workstream") },
+      { label: "project", items: legendPairs(alias.projectKeys, alias.projectColorKeys, 1, "project") },
     ].filter((group) => group.items.length);
     const baseHtml = baseGroups.length
       ? `<div class="legend-col legend-base">${baseGroups
@@ -764,6 +825,9 @@
     const shortName = name.length > 20 ? `${name.slice(0, 18)}…` : name;
     const shortTitle = title.length > 26 ? `${title.slice(0, 24)}…` : title;
     const important = String(d.data.importance || "").trim().toUpperCase() === "Y";
+    const faded = legendSelected.length && !personMatchesAny(d.data);
+    const nameColor = faded ? "#94a3b8" : "#1e293b";
+    const cardOpacity = faded ? "opacity:0.05;" : "";
     const flag = flagFile(d.data.location);
     const fill = cardFill(d.data.branch, d.data.workstream);
     const borderColors = functionColors(d.data.function);
@@ -779,7 +843,7 @@
           <div class="location-indicators" style="display:flex;flex-direction:column;align-items:center;gap:3px;min-height:8px;"></div>
         </div>
         <div style="min-width:0;flex:1 1 auto;">
-          <div style="display:flex;align-items:center;font-size:13px;font-weight:700;color:#1e293b;line-height:1.2;">
+          <div style="display:flex;align-items:center;font-size:13px;font-weight:700;color:${nameColor};line-height:1.2;">
             ${mark}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(shortName)}</span>
           </div>
           <div class="node-title">${esc(shortTitle)}</div>
@@ -794,6 +858,7 @@
         background:${fill};
         border:2px solid #cbd5e1;
         border-radius:${CARD_RADIUS}px;
+        ${cardOpacity}
         display:flex;
         align-items:center;
         gap:8px;
@@ -823,6 +888,7 @@
       html = `
       <div style="
         ${outer ? `width:${d.width}px;height:${d.height}px;` : "width:100%;height:100%;"}
+        ${outer ? cardOpacity : ""}
         padding:${slice}px;
         background:${borderColors[index]};
         border-radius:${radius}px;
@@ -863,6 +929,7 @@
       return;
     }
     const chartData = withForest(rawData);
+    legendSelected = [];
 
     if (!options || !options.keepStatus) hideStatus();
     populateDirectorDropdown(rawData);
@@ -881,6 +948,16 @@
       .compactMarginBetween(() => 24)
       .compactMarginPair(() => 40)
       .neighbourMargin(() => 28)
+      .linkUpdate(function (d) {
+        //const highlighted = d.data._upToTheRootHighlighted;
+        d3.select(this)
+          .attr("fill", "none")
+          .attr("stroke", "lightGrey")
+          .attr("stroke-width", 2)
+          //.attr("stroke", highlighted ? "#E27396" : "#4b5563")
+          //.attr("stroke-width", highlighted ? 5 : 2);
+        //if (highlighted) d3.select(this).raise();
+      })
       .nodeContent(nodeContent)
       .onExpandOrCollapse((node) => {
         if (node.data.id === FOREST_ID) return;
@@ -1196,6 +1273,26 @@
   }
 
   resetBtn.addEventListener("click", resetFullView);
+
+  const legendEl = document.getElementById("legend");
+  if (legendEl) {
+    legendEl.addEventListener("click", (event) => {
+      const button = event.target.closest("button.legend-item");
+      if (!button || !legendEl.contains(button)) return;
+      toggleLegend(button);
+    });
+  }
+
+  const legendMultiInput = document.getElementById("legendMulti");
+  if (legendMultiInput) {
+    legendMultiInput.addEventListener("change", () => {
+      legendMulti = legendMultiInput.checked;
+      if (!legendMulti && legendSelected.length > 1) {
+        legendSelected = [legendSelected[legendSelected.length - 1]];
+      }
+      refreshLegendChart();
+    });
+  }
 
   csvInput.addEventListener("change", async (e) => {
     const file = e.target.files && e.target.files[0];
