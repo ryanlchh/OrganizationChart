@@ -63,6 +63,18 @@
       color2: "blue",
       color3: "yellow",
     },
+    projectKeys: {
+      project1: "Project 1",
+      project2: "Project 2",
+      project3: "Project 3",
+      project4: "Project 4",
+    },
+    projectColorKeys: {
+      color1: "blue",
+      color2: "pink",
+      color3: "yellow",
+      color4: "green",
+    },
   };
 
   let chart = null;
@@ -145,6 +157,7 @@
           branch: String(d.branch || "").trim(),
           function: String(d.function || "").trim(),
           workstream: String(d.workstream || "").trim(),
+          projects: normalizeProjects(d.projects),
         };
       });
   }
@@ -184,7 +197,32 @@
     if (String(source.branch || "").trim()) map.branch = String(source.branch).trim();
     if (String(source.function || "").trim()) map.function = String(source.function).trim();
     if (String(source.workstream || "").trim()) map.workstream = String(source.workstream).trim();
+    map.projects = projectColumns();
     return map;
+  }
+
+  function projectColumns() {
+    const keys = (window.ALIAS && window.ALIAS.projectKeys) || {};
+    return Object.entries(keys)
+      .map(([key, header]) => ({
+        key: String(key),
+        header: String(header == null ? "" : header).trim(),
+      }))
+      .filter((item) => item.header);
+  }
+
+  function normalizeProjects(value) {
+    const source = value && typeof value === "object" ? value : {};
+    const flags = {};
+    projectColumns().forEach((col) => {
+      const raw = source[col.key] != null ? source[col.key] : source[col.header];
+      flags[col.key] = String(raw || "").trim().toUpperCase() === "Y" ? "Y" : "";
+    });
+    return flags;
+  }
+
+  function projectsAreBlank(projects) {
+    return Object.values(projects || {}).every((value) => !String(value || "").trim());
   }
 
   function csvCell(row, header) {
@@ -214,13 +252,18 @@
     if (map.branch) row.branch = blankToEmpty(csvCell(data, map.branch));
     if (map.function) row.function = blankToEmpty(csvCell(data, map.function));
     if (map.workstream) row.workstream = blankToEmpty(csvCell(data, map.workstream));
+    row.projects = {};
+    (map.projects || []).forEach((col) => {
+      row.projects[col.key] = blankToEmpty(csvCell(data, col.header));
+    });
     return row;
   }
 
   function isBlankPerson(row) {
     return !row.id && !row.name && !row.title && !row.parentId &&
       !row.treePriority && !row.location && !row.importance &&
-      !row.branch && !row.function && !row.workstream;
+      !row.branch && !row.function && !row.workstream &&
+      projectsAreBlank(row.projects);
   }
 
   function tokenReason(raw, allowedSet, allowedList, fieldLabel) {
@@ -262,6 +305,17 @@
     return colorName + " has " + colorCount + " color" + (colorCount === 1 ? "" : "s") +
       " but the " + field + " column has " + seen.size + " distinct " + plural +
       ". Need at least as many colors as " + words.group + ".";
+  }
+
+  function projectColorCountReason() {
+    const keyCount = projectColumns().length;
+    if (!keyCount) return "";
+    const colorCount = Object.keys((window.ALIAS && window.ALIAS.projectColorKeys) || {}).length;
+    if (colorCount >= keyCount) return "";
+    const plural = keyCount === 1 ? "project" : "projects";
+    return "projectColorKeys has " + colorCount + " color" + (colorCount === 1 ? "" : "s") +
+      " but projectKeys has " + keyCount + " " + plural +
+      ". Need at least as many colors as projects.";
   }
 
   function rowProblems(rows, map) {
@@ -310,6 +364,12 @@
         );
         if (workstreamReason) reasons.push(workstreamReason);
       }
+      (map.projects || []).forEach((col) => {
+        const raw = String((row.projects && row.projects[col.key]) || "").trim();
+        if (raw && raw.toUpperCase() !== "Y") {
+          reasons.push('project "' + col.header + '" is "' + raw + '", which must be Y or blank.');
+        }
+      });
       const parent = row.parentId.trim();
       if (parent && !ids.has(parent)) {
         const matches = idsByName.get(parent) || [];
@@ -337,6 +397,7 @@
         branch: row.branch || "",
         function: row.function || "",
         workstream: row.workstream || "",
+        projects: normalizeProjects(row.projects),
       };
       return copy;
     });
@@ -657,6 +718,7 @@
       { label: "branch", items: legendPairs(alias.branchKeys, alias.branchColorKeys, BRANCH_OPACITY) },
       { label: "function", items: legendPairs(alias.functionKeys, alias.functionColorKeys, FUNCTION_OPACITY) },
       { label: "workstream", items: legendPairs(alias.workstreamKeys, alias.workstreamColorKeys, WORKSTREAM_OPACITY) },
+      { label: "project", items: legendPairs(alias.projectKeys, alias.projectColorKeys, 1) },
     ].filter((group) => group.items.length);
     const baseHtml = baseGroups.length
       ? `<div class="legend-col legend-base">${baseGroups
@@ -671,6 +733,26 @@
     const map = (window.ALIAS && window.ALIAS.locationKeys) || {};
     const match = Object.entries(map).find(([, label]) => label === location);
     return match ? "./assets/" + match[0] + ".svg" : "";
+  }
+
+  function projectBandHeight() {
+    const count = projectColumns().length;
+    if (!count) return 0;
+    const rows = Math.ceil(count / 14);
+    return 4 + rows * 11;
+  }
+
+  function projectDotsHtml(flags) {
+    const columns = projectColumns();
+    if (!columns.length) return "";
+    const colors = Object.values((window.ALIAS && window.ALIAS.projectColorKeys) || {});
+    const dots = columns.map((col, index) => {
+      const on = String((flags && flags[col.key]) || "").trim().toUpperCase() === "Y";
+      const color = on ? String(colors[index] || "#94a3b8").trim() : "";
+      const style = on ? ` style="background:${esc(color)}"` : "";
+      return `<span class="project-dot${on ? "" : " is-off"}" title="${esc(col.header)}"${style}></span>`;
+    }).join("");
+    return `<div class="project-dots" aria-label="Projects">${dots}</div>`;
   }
 
   function nodeContent(d) {
@@ -701,6 +783,7 @@
             ${mark}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(shortName)}</span>
           </div>
           <div class="node-title">${esc(shortTitle)}</div>
+          ${projectDotsHtml(d.data.projects)}
         </div>`;
     if (!borderColors.length) {
       return `
@@ -791,7 +874,7 @@
       .container("#chart-container")
       .data(chartData)
       .nodeWidth((d) => (d.data.id === FOREST_ID ? 8 : 228))
-      .nodeHeight((d) => (d.data.id === FOREST_ID ? 8 : 72))
+      .nodeHeight((d) => (d.data.id === FOREST_ID ? 8 : 72 + projectBandHeight()))
       .nodeButtonWidth((d) => (d.data.id === FOREST_ID ? 0 : 40))
       .nodeButtonHeight((d) => (d.data.id === FOREST_ID ? 0 : 40))
       .childrenMargin(() => 40)
@@ -967,6 +1050,10 @@
     if (map.branch) required.push("branch");
     if (map.function) required.push("function");
     if (map.workstream) required.push("workstream");
+    (map.projects || []).forEach((col) => {
+      map[col.key] = col.header;
+      required.push(col.key);
+    });
     const missing = required.filter((key) => !map[key] || !trimmed.includes(map[key]));
     if (missing.length) {
       const detail = missing.map((key) => '"' + (map[key] || key) + '" (needed for ' + key + ")").join(", ");
@@ -1011,6 +1098,11 @@
         showStatus(workstreamColors, true);
         return;
       }
+    }
+    const projectColors = projectColorCountReason();
+    if (projectColors) {
+      showStatus(projectColors, true);
+      return;
     }
     finishCsvLoad(rows, sourceName, 0);
   }
@@ -1164,6 +1256,11 @@
           showStatus(workstreamColors, true);
           return;
         }
+      }
+      const projectColors = projectColorCountReason();
+      if (projectColors) {
+        showStatus(projectColors, true);
+        return;
       }
       finishCsvLoad(kept, sourceName, drop.size);
     });

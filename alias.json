@@ -51,5 +51,17 @@
     "color2": "lightBlue",
     "color3": "lightGreen",
     "color4": "lightOrange"
+  },
+  "projectKeys": {
+    "project1": "Project 1",
+    "project2": "Project 2",
+    "project3": "Project 3",
+    "project4": "Project 4"
+  },
+  "projectColorKeys": {
+    "color1": "blue",
+    "color2": "pink",
+    "color3": "yellow",
+    "color4": "green"
   }
 }

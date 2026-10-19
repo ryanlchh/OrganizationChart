@@ -551,6 +551,30 @@
       box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
     }
 
+    .project-dots {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 3px;
+      margin-top: 4px;
+    }
+
+    .project-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      box-sizing: border-box;
+      flex: 0 0 auto;
+      border: 1px solid transparent;
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+    }
+
+    .project-dot.is-off {
+      background: #d4d4d8;
+      border-color: #a1a1aa;
+      box-shadow: none;
+    }
+
     #chart-container .node-foreign-object-div {
       font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
     }
@@ -793,6 +817,7 @@
       <li><strong>Current person</strong> — Use <em>Current View</em> just above the chart and pick a director or leader. The chart zooms to them and shows their team. Opening a director on the chart also selects them here.</li>
       <li><strong>Hide or show a team</strong> — Tap or click any card to fold or unfold the people underneath.</li>
       <li><strong>Go back to overview</strong> — Tap the reset icon in the header to return to the full leadership map.</li>
+      <li><strong>Projects</strong> — Dots under the role follow the project list. A colored dot means that person is on the project. A light grey dot means they are not. The footer groups those colors under <em>project</em>.</li>
     </ol>
     <p class="tip">
       Open this page in your browser (double-click <code>index.html</code>).

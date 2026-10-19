@@ -352,8 +352,15 @@
       if (functionHeader) columnMap.function = functionHeader;
       const workstreamHeader = map.workstream == null ? "" : String(map.workstream).trim();
       if (workstreamHeader) columnMap.workstream = workstreamHeader;
+      const storedColumns = {};
+      MAP_KEYS.forEach((key) => {
+        storedColumns[key] = columnMap[key];
+      });
+      if (columnMap.branch) storedColumns.branch = columnMap.branch;
+      if (columnMap.function) storedColumns.function = columnMap.function;
+      if (columnMap.workstream) storedColumns.workstream = columnMap.workstream;
       window.ALIAS = {
-        columnKeys: columnMap,
+        columnKeys: storedColumns,
         locationKeys: locations,
         branchKeys: alias.branchKeys && typeof alias.branchKeys === "object" ? alias.branchKeys : {},
         branchColorKeys: alias.branchColorKeys && typeof alias.branchColorKeys === "object" ? alias.branchColorKeys : {},
@@ -364,7 +371,18 @@
           alias.workstreamColorKeys && typeof alias.workstreamColorKeys === "object"
             ? alias.workstreamColorKeys
             : {},
+        projectKeys: alias.projectKeys && typeof alias.projectKeys === "object" ? alias.projectKeys : {},
+        projectColorKeys:
+          alias.projectColorKeys && typeof alias.projectColorKeys === "object"
+            ? alias.projectColorKeys
+            : {},
       };
+      columnMap.projects = Object.entries(window.ALIAS.projectKeys)
+        .map(([key, header]) => ({
+          key: String(key),
+          header: String(header == null ? "" : header).trim(),
+        }))
+        .filter((item) => item.header);
       setMapStatus("Using mapping from " + sourceLabel + ".");
       return true;
     }
@@ -421,13 +439,22 @@
       if (map.branch) row.branch = blankToEmpty(cell(d, map.branch));
       if (map.function) row.function = blankToEmpty(cell(d, map.function));
       if (map.workstream) row.workstream = blankToEmpty(cell(d, map.workstream));
+      row.projects = {};
+      (map.projects || []).forEach((col) => {
+        row.projects[col.key] = blankToEmpty(cell(d, col.header));
+      });
       return row;
+    }
+
+    function projectsAreBlank(projects) {
+      return Object.values(projects || {}).every((value) => !String(value || "").trim());
     }
 
     function isBlankRow(row) {
       return !row.id && !row.name && !row.title && !row.parentId &&
         !row.treePriority && !row.location && !row.importance &&
-        !row.branch && !row.function && !row.workstream;
+        !row.branch && !row.function && !row.workstream &&
+        projectsAreBlank(row.projects);
     }
 
     function tokenReason(raw, allowedSet, allowedList, fieldLabel) {
@@ -469,6 +496,17 @@
       return colorName + " has " + colorCount + " color" + (colorCount === 1 ? "" : "s") +
         " but the " + field + " column has " + seen.size + " distinct " + plural +
         ". Need at least as many colors as " + words.group + ".";
+    }
+
+    function projectColorCountReason() {
+      const keyCount = (columnMap.projects || []).length;
+      if (!keyCount) return "";
+      const colorCount = Object.keys((window.ALIAS && window.ALIAS.projectColorKeys) || {}).length;
+      if (colorCount >= keyCount) return "";
+      const plural = keyCount === 1 ? "project" : "projects";
+      return "projectColorKeys has " + colorCount + " color" + (colorCount === 1 ? "" : "s") +
+        " but projectKeys has " + keyCount + " " + plural +
+        ". Need at least as many colors as projects.";
     }
 
     function rowProblems(rows) {
@@ -524,6 +562,12 @@
           );
           if (workstreamReason) reasons.push(workstreamReason);
         }
+        (columnMap.projects || []).forEach((col) => {
+          const raw = String((row.projects && row.projects[col.key]) || "").trim();
+          if (raw && raw.toUpperCase() !== "Y") {
+            reasons.push('project "' + col.header + '" is "' + raw + '", which must be Y or blank.');
+          }
+        });
 
         const parent = row.parentId.trim();
         if (parent && !ids.has(parent)) {
@@ -554,6 +598,13 @@
         if (columnMap.branch) copy.branch = row.branch || "";
         if (columnMap.function) copy.function = row.function || "";
         if (columnMap.workstream) copy.workstream = row.workstream || "";
+        if ((columnMap.projects || []).length) {
+          copy.projects = {};
+          columnMap.projects.forEach((col) => {
+            const raw = String((row.projects && row.projects[col.key]) || "").trim();
+            copy.projects[col.key] = raw.toUpperCase() === "Y" ? "Y" : "";
+          });
+        }
         return copy;
       });
     }
@@ -607,6 +658,11 @@
           return;
         }
       }
+      const projectColors = projectColorCountReason();
+      if (projectColors) {
+        setMessage(projectColors, true);
+        return;
+      }
 
       const parentError = resolveParentNames(rows);
       if (parentError) {
@@ -645,6 +701,10 @@
       if (columnMap.branch) requiredHeaders.push("branch");
       if (columnMap.function) requiredHeaders.push("function");
       if (columnMap.workstream) requiredHeaders.push("workstream");
+      (columnMap.projects || []).forEach((col) => {
+        columnMap[col.key] = col.header;
+        requiredHeaders.push(col.key);
+      });
       const missing = requiredHeaders.filter((key) => !trimmed.includes(columnMap[key]));
       if (missing.length) {
         const detail = missing
