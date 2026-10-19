@@ -229,6 +229,7 @@
 
     let readyRows = null;
     let columnMap = null;
+    let sourceFileName = "";
 
     function setMessage(text, isError) {
       message.textContent = text;
@@ -483,12 +484,14 @@
 
     csvInput.addEventListener("change", async (event) => {
       const file = event.target.files && event.target.files[0];
+      sourceFileName = "";
       if (!file) {
         setMessage("No file selected yet.");
         return;
       }
       try {
         readCsvText(await file.text());
+        if (readyRows) sourceFileName = file.name;
       } catch (err) {
         setMessage("Could not read that file. Try saving it again as CSV (UTF-8).", true);
       }
@@ -506,7 +509,13 @@
 
     downloadBtn.addEventListener("click", () => {
       if (!readyRows) return;
-      const body = "window.ORG_DATA = " + JSON.stringify(readyRows) + ";\n";
+      const aliasLine = window.ALIAS
+        ? "window.ALIAS = " + JSON.stringify(window.ALIAS) + ";\n"
+        : "";
+      const body =
+        aliasLine +
+        "window.ORG_SOURCE = " + JSON.stringify(sourceFileName) + ";\n" +
+        "window.ORG_DATA = " + JSON.stringify(readyRows) + ";\n";
       const blob = new Blob([body], { type: "text/javascript" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -518,6 +527,6 @@
       URL.revokeObjectURL(url);
     });
   </script>
-  <footer>Internal Use only</footer>
+  <footer>Internal use only</footer>
 </body>
 </html>

@@ -10,6 +10,7 @@
   const directorSelect = document.getElementById("directorSelect");
   const resetBtn = document.getElementById("resetBtn");
   const csvInput = document.getElementById("csvInput");
+  const sourceNameEl = document.getElementById("sourceName");
   const searchForm = document.getElementById("searchForm");
   const personSearch = document.getElementById("personSearch");
   const searchResults = document.getElementById("searchResults");
@@ -23,6 +24,11 @@
   function hideStatus() {
     statusEl.classList.remove("visible", "error");
     statusEl.textContent = "";
+  }
+
+  function setSourceName(name) {
+    if (!sourceNameEl) return;
+    sourceNameEl.textContent = String(name || "").trim();
   }
 
   function normalizeRows(rows) {
@@ -247,6 +253,44 @@
     return picked;
   }
 
+  function legendPairs(nameMap, colorMap, opacity) {
+    const names = Object.values(nameMap || {});
+    const colors = Object.values(colorMap || {});
+    const count = Math.min(names.length, colors.length);
+    const items = [];
+    for (let i = 0; i < count; i += 1) {
+      const name = String(names[i] || "").trim();
+      const color = String(colors[i] || "").trim();
+      if (!name || !color) continue;
+      items.push({
+        name,
+        color: opacity < 1 ? withOpacity(color, opacity) : color,
+      });
+    }
+    return items;
+  }
+
+  function renderLegend() {
+    const el = document.getElementById("legend");
+    if (!el) return;
+    const alias = window.ALIAS || {};
+    const groups = [
+      legendPairs(alias.branchKeys, alias.branchColorKeys, COLOR_OPACITY),
+      legendPairs(alias.functionKeys, alias.functionColorKeys, 1),
+    ].filter((group) => group.length);
+    el.innerHTML = groups
+      .map((group) => {
+        const rows = group
+          .map(
+            (item) =>
+              `<span class="legend-item"><span class="legend-dot" style="background:${esc(item.color)}"></span><span>${esc(item.name)}</span></span>`
+          )
+          .join("");
+        return `<div class="legend-col">${rows}</div>`;
+      })
+      .join("");
+  }
+
   function functionBarFill(colors) {
     if (colors.length <= 1) return colors[0] || "transparent";
     const stops = colors.map((color, index) => {
@@ -279,7 +323,7 @@
       ? `<span title="Important" style="flex:0 0 auto;margin-right:4px;color:#7ec8e3;font-weight:700;line-height:1;">*</span>`
       : "";
     const flagHtml = flag
-      ? `<div style="width:28px;height:28px;border-radius:50%;background:#f4f6f8;border:1px solid #e5e7eb;display:flex;align-items:center;justify-content:center;flex:0 0 auto;"><img src="${esc(flag)}" alt="${esc(d.data.location)}" style="width:18px;height:12px;object-fit:contain;display:block;" /></div>`
+      ? `<div style="width:28px;height:28px;border-radius:50%;background:#f4f6f8;border:1px solid #e5e7eb;display:flex;align-items:center;justify-content:center;flex:0 0 auto;"><img src="${esc(flag)}" alt="${esc(d.data.location)}" style="width:18px;object-fit:contain;display:block;" /></div>`
       : "";
     const body = `
         <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:28px;flex:0 0 auto;">
@@ -541,9 +585,9 @@
       us: "US",
     },
     branchKeys: {
-      branch1: "HK1",
-      branch2: "HK2",
-      branch3: "UK1",
+      branch1: "branch1",
+      branch2: "branch2",
+      branch3: "branch3",
     },
     branchColorKeys: {
       color1: "#FF7F7F",
@@ -564,21 +608,29 @@
     },
   };
 
+  function aliasIsUsable(alias) {
+    return Boolean(alias && alias.columnKeys && alias.locationKeys);
+  }
+
   async function loadAlias() {
-    if (window.ALIAS && window.ALIAS.locationKeys && window.ALIAS.columnKeys) return;
     try {
       const response = await fetch("./alias.json");
       if (!response.ok) throw new Error("missing");
-      window.ALIAS = await response.json();
+      const alias = await response.json();
+      if (aliasIsUsable(alias)) window.ALIAS = alias;
     } catch (err) {
-      window.ALIAS = FALLBACK_ALIAS;
+      // Opening index.html by double-click cannot read alias.json.
+      // prepare.html stores that same mapping on window.ALIAS in data.js.
     }
+    if (!aliasIsUsable(window.ALIAS)) window.ALIAS = FALLBACK_ALIAS;
+    renderLegend();
   }
 
   async function tryFetchDefaultCsv() {
     await loadAlias();
     // Bundled data works by double-clicking index.html (no Node, no server).
     if (Array.isArray(window.ORG_DATA) && window.ORG_DATA.length) {
+      setSourceName(window.ORG_SOURCE || "");
       buildChart(window.ORG_DATA);
       return;
     }
@@ -587,6 +639,7 @@
       const response = await fetch(CSV_URL);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const text = await response.text();
+      setSourceName("hr_org.csv");
       await loadCsvText(text);
     } catch (err) {
       showStatus(
@@ -634,6 +687,7 @@
     if (!file) return;
     try {
       const text = await file.text();
+      setSourceName(file.name);
       await loadCsvText(text);
     } catch (err) {
       showStatus("Failed to read the selected CSV file.", true);

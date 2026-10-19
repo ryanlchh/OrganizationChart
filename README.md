@@ -44,7 +44,7 @@ CSV / `ORG_DATA` rows:
 | `location` | Yes, every person | One of the values in `alias.json` `locationKeys`. The key is the flag file name in `assets` without `.svg` |
 | `importance` | Column required; value may be blank | `Y` shows an asterisk before the name |
 | `branch` | Optional column; value may be blank | Hiring-company alias from `alias.json` `branchKeys`. A mix is several aliases joined by `/`, such as `HK1/HK2`. A blank cell leaves the card white |
-| `function` | Optional column; value may be blank | Function alias from `alias.json` `functionKeys`. A mix is several aliases joined by ` / `, such as `function1 / function2`. A blank cell keeps the thin gray border and no left bar |
+| `function` | Optional column; value may be blank | Function alias from `alias.json` `functionKeys`. A mix is several aliases joined by `/`, such as `Business/Tech`. A blank cell keeps the thin gray border and no left bar |
 
 `data.js` always uses those canonical field names. Market CSV headers can differ. `alias.json` `columnKeys` supplies the real header for each field. Column order does not matter. Omit `columnKeys.branch` when the file has no hiring-alias column. Omit `columnKeys.function` when the file has no function column.
 
@@ -56,15 +56,17 @@ Then open `prepare.html`, choose the CSV, and download a new `data.js`. If a map
 
 When `columnKeys.branch` is set, prepare also checks that column. Each non-blank cell is split on `/`. Every part must be a `branchKeys` value. The number of colors in `branchColorKeys` must be at least the number of distinct branches in the file. Three branches and three colors passes; three branches and two colors fails. People with a branch are filled with those colors at 50% opacity: one alias is a solid tint, two aliases split the card in half, three aliases take about a third each.
 
-When `columnKeys.function` is set, prepare checks that column the same way against `functionKeys` and `functionColorKeys`. A person with a function gets a 10px bar on the left of the card in that color at full opacity. A mix such as `function1 / function2` keeps that same 10px width and splits it into equal blocks stacked top to bottom, one color per function, so every card stays the same size. The first function is the top block. A blank cell keeps the thin gray border and no bar.
+When `columnKeys.function` is set, prepare checks that column the same way against `functionKeys` and `functionColorKeys`. A person with a function gets a 10px bar on the left of the card in that color at full opacity. A mix such as `Business/Tech` keeps that same 10px width and splits it into equal blocks stacked top to bottom, one color per function, so every card stays the same size. The first function is the top block. A blank cell keeps the thin gray border and no bar.
+
+Downloading `data.js` also saves the alias that was used (`window.ALIAS`). The chart needs that copy: double-clicking `index.html` cannot read `alias.json`. Change `alias.json`, then download `data.js` again, before the legend names and card colors update offline. The legend prints each `branchKeys` and `functionKeys` value, in the same order as the color lists.
 
 ## How users open the chart
 
 1. Keep `index.html`, `app.js`, `data.js`, and the `packages/` folder together.
 2. Double-click `index.html` — fully offline; no CDN needed.
-3. Use **How to use** on the page for business-facing steps.
+3. Use **Help Guide** on the page for business-facing steps.
 
-`file://` cannot reliably `fetch` a sibling CSV; that is why data is bundled in `data.js`.
+`file://` cannot reliably `fetch` a sibling CSV or `alias.json`; that is why both the rows and the alias are bundled in `data.js`.
 
 ## Updating org data (no Python)
 
