@@ -801,6 +801,124 @@
     });
   }
 
+  const EXPORT_CARD_CSS = [
+    "body { margin: 0; background: #f3f3f3; }",
+    "svg { display: block; max-width: 100%; height: auto; }",
+    ".node-foreign-object-div, .node-foreign-object-div div { font-family: \"Segoe UI\", Tahoma, Geneva, Verdana, sans-serif; }",
+    ".node-title { display: inline-block; width: auto; max-width: 100%; margin-top: 4px; padding: 1px 6px; font-size: 11px; line-height: 1.2; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: #e6d6d6; border: 1px solid rgba(148, 163, 184, 0.35); border-radius: 4px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 1px 2px rgba(15, 23, 42, 0.08); vertical-align: top; }",
+    ".project-dots { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; margin-top: 4px; }",
+    ".project-dot { width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; flex: 0 0 auto; border: 1px solid transparent; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); }",
+    ".project-dot.is-off { background: #d4d4d8; border-color: #a1a1aa; box-shadow: none; }",
+  ].join("\n");
+
+  async function inlineExportFlags(root) {
+    const images = Array.from(root.querySelectorAll("img"));
+    const cache = new Map();
+    for (const img of images) {
+      const src = img.getAttribute("src") || "";
+      if (!src || src.startsWith("data:")) continue;
+      if (!cache.has(src)) {
+        try {
+          const response = await fetch(src);
+          if (!response.ok) throw new Error("missing");
+          const text = await response.text();
+          cache.set(src, "data:image/svg+xml;charset=utf-8," + encodeURIComponent(text));
+        } catch (err) {
+          cache.set(src, src);
+        }
+      }
+      img.setAttribute("src", cache.get(src));
+    }
+  }
+
+  function frameExportSvg(svg, nodes) {
+    const center = svg.querySelector(".center-group");
+    const chartGroup = svg.querySelector(".chart");
+    if (chartGroup) chartGroup.setAttribute("transform", "");
+    if (center) center.setAttribute("transform", "");
+    svg.querySelectorAll(".node-button-g").forEach((button) => button.remove());
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    (nodes || []).forEach((node) => {
+      if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) return;
+      const width = Number.isFinite(node.width) ? node.width : 0;
+      const height = Number.isFinite(node.height) ? node.height : 0;
+      minX = Math.min(minX, node.x);
+      minY = Math.min(minY, node.y);
+      maxX = Math.max(maxX, node.x + width);
+      maxY = Math.max(maxY, node.y + height);
+    });
+    if (!Number.isFinite(minX) || !Number.isFinite(minY)) {
+      minX = 0;
+      minY = 0;
+      maxX = 1600;
+      maxY = 900;
+    }
+    const pad = 40;
+    const width = Math.max(1, Math.ceil(maxX - minX + pad * 2));
+    const height = Math.max(1, Math.ceil(maxY - minY + pad * 2));
+    svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    svg.setAttribute("width", String(width));
+    svg.setAttribute("height", String(height));
+    svg.setAttribute("viewBox", (minX - pad) + " " + (minY - pad) + " " + width + " " + height);
+  }
+
+  function downloadExportHtml(svgMarkup) {
+    const html = "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\" />\n<title>Org chart</title>\n<style>\n" +
+      EXPORT_CARD_CSS + "\n</style>\n</head>\n<body>\n" + svgMarkup + "\n</body>\n</html>\n";
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "org-chart.html";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function exportMapHtml() {
+    if (!chart || !rawData.length) return;
+    const overlay = document.getElementById("chartBusy");
+    if (overlay) overlay.hidden = false;
+    await new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    });
+    const host = document.createElement("div");
+    host.id = "export-chart";
+    host.style.cssText = "position:fixed;left:-12000px;top:0;width:1600px;height:900px;overflow:hidden;pointer-events:none;";
+    document.body.appendChild(host);
+    try {
+      const exportData = withForest(rawData).map((row) => ({ ...row, _expanded: true }));
+      const exportChart = new d3.OrgChart()
+        .container("#export-chart")
+        .data(exportData)
+        .svgWidth(1600)
+        .svgHeight(900)
+        .nodeWidth((d) => (d.data.id === FOREST_ID ? 8 : 228))
+        .nodeHeight((d) => (d.data.id === FOREST_ID ? 8 : 72 + projectBandHeight()))
+        .nodeButtonWidth(() => 0)
+        .nodeButtonHeight(() => 0)
+        .childrenMargin(() => 40)
+        .compactMarginBetween(() => 24)
+        .compactMarginPair(() => 40)
+        .neighbourMargin(() => 28)
+        .duration(0)
+        .nodeContent(nodeContent);
+      exportChart.render();
+      const svg = host.querySelector("svg");
+      if (!svg) return;
+      frameExportSvg(svg, exportChart.getChartState().allNodes);
+      await inlineExportFlags(svg);
+      downloadExportHtml(svg.outerHTML);
+    } finally {
+      host.remove();
+      if (overlay) overlay.hidden = true;
+    }
+  }
+
   function toggleLegend(button) {
     const entry = {
       kind: button.dataset.kind || "",
@@ -1390,6 +1508,18 @@
   if (zoomOutBtn) {
     zoomOutBtn.addEventListener("click", () => {
       if (chart) chart.zoomOut();
+    });
+  }
+
+  const exportBtn = document.getElementById("exportBtn");
+  if (exportBtn) {
+    exportBtn.addEventListener("click", () => {
+      exportMapHtml().catch((err) => {
+        const overlay = document.getElementById("chartBusy");
+        if (overlay) overlay.hidden = true;
+        showStatus("Could not export the chart.", true);
+        console.warn(err);
+      });
     });
   }
 
