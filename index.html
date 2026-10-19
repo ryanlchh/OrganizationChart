@@ -429,15 +429,36 @@
       color: var(--accent);
     }
 
-    #chart-container {
+    #chart-stage {
       flex: 1 1 auto;
       width: 100%;
+      min-height: 0;
+      position: relative;
+    }
+
+    #chart-container {
+      width: 100%;
+      height: 100%;
       min-height: 0;
       position: relative;
       z-index: 1;
       overflow: hidden;
       touch-action: none;
     }
+
+    .chart-busy {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(243, 243, 243, 0.72);
+      color: #334155;
+      font-size: 14px;
+    }
+
+    .chart-busy[hidden] { display: none; }
 
     #chart-container svg {
       display: block;
@@ -816,6 +837,21 @@
         </form>
         <ul id="searchResults" hidden></ul>
       </div>
+      <button type="button" class="icon-btn" id="zoomInBtn" title="Zoom in" aria-label="Zoom in">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="6.5"/>
+          <path d="M16 16l4 4"/>
+          <path d="M11 8.5v5"/>
+          <path d="M8.5 11h5"/>
+        </svg>
+      </button>
+      <button type="button" class="icon-btn" id="zoomOutBtn" title="Zoom out" aria-label="Zoom out">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="6.5"/>
+          <path d="M16 16l4 4"/>
+          <path d="M8.5 11h5"/>
+        </svg>
+      </button>
       <button type="button" class="icon-btn" id="resetBtn" title="Reset full view" aria-label="Reset full view">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M3 12a9 9 0 1 0 3-6.7"/>
@@ -847,13 +883,13 @@
     </button>
     <h2>Quick guide</h2>
     <ol>
-      <li><strong>See the big picture</strong> — The map opens showing leadership down to directors. Drag to move around. Pinch or scroll to zoom.</li>
+      <li><strong>See the big picture</strong> — The map opens showing leadership down to directors. Drag to move around. Use the magnify and diminish buttons in the header to zoom.</li>
       <li><strong>Search</strong> — Use the search box in the header. Type a name or an ID, then press Enter or tap a result. The chart opens that person.</li>
       <li><strong>Current person</strong> — Use <em>Current View</em> just above the chart and pick a director or leader. The chart zooms to them and shows their team. Opening a director on the chart also selects them here.</li>
       <li><strong>Hide or show a team</strong> — Tap or click any card to fold or unfold the people underneath.</li>
       <li><strong>Go back to overview</strong> — Tap the reset icon in the header to return to the full leadership map.</li>
       <li><strong>Projects</strong> — Dots under the role follow the project list. A colored dot means that person is on the project. A light grey dot means they are not. The footer groups those colors under <em>project</em>.</li>
-      <li><strong>Filter from the legend</strong> — Click a legend to fade people who do not match. Their card drops to a faint tint and the name turns grey. The reporting lines stay in place. Click the legend again to clear. Turn on <em>Multi-select</em> to keep several legends at once. A person matches if any selected legend applies.</li>
+      <li><strong>Filter from the legend</strong> — Click a legend to fade people who do not match. Their card drops to a faint tint and the name turns grey. The reporting lines stay in place. Click the legend again to clear. Turn on <em>Multi-select</em> to keep several legends at once. A person matches if any selected legend applies. <em>Auto-expand</em> opens every matching person, and the managers above them, when you click a legend.</li>
     </ol>
     <p class="tip">
       Open this page in your browser (double-click <code>index.html</code>).
@@ -884,7 +920,10 @@
       </div>
     </div>
   </div>
-  <div id="chart-container"></div>
+  <div id="chart-stage">
+    <div id="chart-container"></div>
+    <div id="chartBusy" class="chart-busy" hidden>Updating chart…</div>
+  </div>
   <footer id="site-footer">
     <div class="footer-meta">
       <button type="button" class="icon-btn" id="helpBtn" title="Help Guide" aria-label="Help Guide">
@@ -899,6 +938,10 @@
     <label class="legend-multi" for="legendMulti">
       <input type="checkbox" id="legendMulti" />
       Multi-select
+    </label>
+    <label class="legend-multi" for="legendAutoExpand">
+      <input type="checkbox" id="legendAutoExpand" />
+      Auto-expand
     </label>
     <div id="legend" class="legend" aria-label="Color legend"></div>
   </footer>

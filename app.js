@@ -82,6 +82,7 @@
   let functionMark = FUNCTION_MARK_DEFAULT;
   let pendingLoad = null;
   let legendMulti = false;
+  let legendAutoExpand = false;
   let legendSelected = [];
 
   const statusEl = document.getElementById("status");
@@ -727,9 +728,77 @@
     return legendSelected.some((entry) => personMatchesLegend(row, entry));
   }
 
+  function expandLegendMatches() {
+    if (!chart) return;
+    const state = chart.getChartState();
+    state.allNodes.forEach((node) => {
+      node.data._expanded = node.data.id === FOREST_ID;
+    });
+    state.allNodes.forEach((node) => {
+      if (node.data.id === FOREST_ID || !personMatchesAny(node.data)) return;
+      let current = node.parent;
+      while (current) {
+        current.data._expanded = true;
+        current = current.parent;
+      }
+    });
+  }
+
+  function chartDuration() {
+    const state = chart && chart.getChartState();
+    return state && typeof state.duration === "number" ? state.duration : 400;
+  }
+
+  function withInstantLayout(update) {
+    const previous = chartDuration();
+    chart.duration(0);
+    try {
+      update();
+    } finally {
+      chart.duration(previous || 400);
+    }
+  }
+
+  function runChartUpdate(update) {
+    const overlay = document.getElementById("chartBusy");
+    if (overlay) overlay.hidden = false;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        try {
+          update();
+        } finally {
+          if (overlay) overlay.hidden = true;
+        }
+      });
+    });
+  }
+
+  function applyLegendLayout() {
+    if (!chart) return;
+    withInstantLayout(() => {
+      if (legendAutoExpand) {
+        if (legendSelected.length) expandLegendMatches();
+        else applyInitialExpansion();
+        chart.render().fit();
+      } else {
+        chart.render();
+      }
+    });
+  }
+
   function refreshLegendChart() {
     renderLegend(rawData);
-    if (chart) chart.render();
+    if (!chart) return;
+    runChartUpdate(applyLegendLayout);
+  }
+
+  function disableWheelZoom() {
+    const zoom = chart && chart.getChartState().zoomBehavior;
+    if (!zoom || typeof zoom.filter !== "function") return;
+    zoom.filter((event) => {
+      if (!event || event.type === "wheel") return false;
+      return !event.ctrlKey && !event.button;
+    });
   }
 
   function toggleLegend(button) {
@@ -979,6 +1048,7 @@
     applyInitialExpansion();
     sizeChartToContainer();
     chart.render().fit();
+    disableWheelZoom();
     window.__orgChart = chart;
   }
 
@@ -1291,6 +1361,35 @@
         legendSelected = [legendSelected[legendSelected.length - 1]];
       }
       refreshLegendChart();
+    });
+  }
+
+  const legendAutoInput = document.getElementById("legendAutoExpand");
+  if (legendAutoInput) {
+    legendAutoInput.addEventListener("change", () => {
+      legendAutoExpand = legendAutoInput.checked;
+      if (!chart) return;
+      if (legendAutoExpand && !legendSelected.length) return;
+      runChartUpdate(() => {
+        withInstantLayout(() => {
+          if (legendAutoExpand && legendSelected.length) expandLegendMatches();
+          else applyInitialExpansion();
+          chart.render().fit();
+        });
+      });
+    });
+  }
+
+  const zoomInBtn = document.getElementById("zoomInBtn");
+  const zoomOutBtn = document.getElementById("zoomOutBtn");
+  if (zoomInBtn) {
+    zoomInBtn.addEventListener("click", () => {
+      if (chart) chart.zoomIn();
+    });
+  }
+  if (zoomOutBtn) {
+    zoomOutBtn.addEventListener("click", () => {
+      if (chart) chart.zoomOut();
     });
   }
 
