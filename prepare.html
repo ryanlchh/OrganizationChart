@@ -81,7 +81,7 @@
     }
 
     main {
-      max-width: 720px;
+      max-width: 880px;
       margin: 28px auto;
       padding: 0 16px 48px;
     }
@@ -165,6 +165,52 @@
 
     #message.error, #mapStatus.error { color: #991b1b; }
 
+    #rowErrors {
+      margin-top: 12px;
+    }
+
+    .table-wrap {
+      max-height: 320px;
+      overflow: auto;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+    }
+
+    #rowErrors table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    #rowErrors th,
+    #rowErrors td {
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid #fee2e2;
+    }
+
+    #rowErrors th {
+      position: sticky;
+      top: 0;
+      background: #fef2f2;
+      color: #991b1b;
+      font-weight: 600;
+    }
+
+    #rowErrors td { color: #334155; }
+
+    #skipBtn {
+      margin-top: 12px;
+      background: #fff;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+    }
+
+    #skipBtn:hover:not(:disabled) {
+      background: #fff5f5;
+    }
+
     .note {
       font-size: 13px;
       color: #64748b;
@@ -190,7 +236,7 @@
       <ol class="steps">
         <li>Ask IT for the latest org list as a CSV. Column titles can differ by market. IT keeps those names, and the location flags, in <code>alias.json</code>.</li>
         <li>This page loads <code>alias.json</code> from the same folder. If it cannot, click <strong>Mapping JSON</strong> and choose that file.</li>
-        <li>Click <strong>Choose CSV</strong> and pick the org file. If a mapped column is missing, the message names it so IT can fix the file or the map.</li>
+        <li>Click <strong>Choose CSV</strong> and pick the org file. If a mapped column is missing, the message names it so IT can fix the file or the map. If some people rows are invalid, they are listed with a reason. You can skip those rows and still download <code>data.js</code>.</li>
         <li>When the ready message appears, click <strong>Download data.js</strong>.</li>
         <li>Find the downloaded file (usually in your Downloads folder). Move it into the same folder as <code>index.html</code>, and replace the old <code>data.js</code> if asked.</li>
         <li>Open <code>index.html</code> (or refresh it) to see the updated chart.</li>
@@ -217,6 +263,22 @@
       </div>
       <div id="mapStatus">Looking for alias.json…</div>
       <div id="message">No file selected yet.</div>
+      <div id="rowErrors" hidden>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Line</th>
+                <th>id</th>
+                <th>name</th>
+                <th>Reason</th>
+              </tr>
+            </thead>
+            <tbody id="rowErrorBody"></tbody>
+          </table>
+        </div>
+        <button type="button" id="skipBtn">Skip these rows and prepare data.js</button>
+      </div>
     </div>
   </main>
   <script>
@@ -224,16 +286,41 @@
     const csvInput = document.getElementById("csvInput");
     const mapInput = document.getElementById("mapInput");
     const downloadBtn = document.getElementById("downloadBtn");
+    const skipBtn = document.getElementById("skipBtn");
     const message = document.getElementById("message");
     const mapStatus = document.getElementById("mapStatus");
+    const rowErrors = document.getElementById("rowErrors");
+    const rowErrorBody = document.getElementById("rowErrorBody");
 
     let readyRows = null;
     let columnMap = null;
     let sourceFileName = "";
+    let records = [];
+    let skippedTotal = 0;
 
     function setMessage(text, isError) {
       message.textContent = text;
       message.classList.toggle("error", Boolean(isError));
+      hideRowErrors();
+    }
+
+    function hideRowErrors() {
+      rowErrors.hidden = true;
+      rowErrorBody.replaceChildren();
+    }
+
+    function showRowErrors(problems) {
+      rowErrorBody.replaceChildren();
+      problems.forEach((problem) => {
+        const tr = document.createElement("tr");
+        [String(problem.line), problem.id || "(blank)", problem.name || "(blank)", problem.reasons.join("; ")].forEach((text) => {
+          const td = document.createElement("td");
+          td.textContent = text;
+          tr.appendChild(td);
+        });
+        rowErrorBody.appendChild(tr);
+      });
+      rowErrors.hidden = false;
     }
 
     function setMapStatus(text, isError) {
@@ -307,38 +394,207 @@
       return key ? row[key] : "";
     }
 
-    function toRows(parsed, map) {
-      return parsed
-        .filter((d) => String(cell(d, map.id) || "").trim() !== "")
-        .map((d) => {
-          const parentId = String(cell(d, map.parentId) || "").trim();
-          const priority = String(cell(d, map.treePriority) || "").trim();
-          const location = String(cell(d, map.location) || "").trim();
-          const importance = String(cell(d, map.importance) || "").trim();
-          const row = {
-            id: String(cell(d, map.id)).trim(),
-            name: String(cell(d, map.name) || "").trim(),
-            title: String(cell(d, map.title) || "").trim(),
-            parentId: parentId.toLowerCase() === "null" ? "" : parentId,
-            treePriority: priority.toLowerCase() === "null" ? "" : priority,
-            location: location.toLowerCase() === "null" ? "" : location,
-            importance: importance.toLowerCase() === "null" ? "" : importance,
-          };
-          if (map.branch) {
-            const branch = String(cell(d, map.branch) || "").trim();
-            row.branch = branch.toLowerCase() === "null" ? "" : branch;
-          }
-          if (map.function) {
-            const job = String(cell(d, map.function) || "").trim();
-            row.function = job.toLowerCase() === "null" ? "" : job;
-          }
-          return row;
+    function blankToEmpty(value) {
+      const text = String(value || "").trim();
+      return text.toLowerCase() === "null" ? "" : text;
+    }
+
+    function mapRecord(record, map) {
+      const d = record.data;
+      const row = {
+        _line: record.line,
+        id: String(cell(d, map.id) || "").trim(),
+        name: String(cell(d, map.name) || "").trim(),
+        title: String(cell(d, map.title) || "").trim(),
+        parentId: blankToEmpty(cell(d, map.parentId)),
+        treePriority: blankToEmpty(cell(d, map.treePriority)),
+        location: blankToEmpty(cell(d, map.location)),
+        importance: blankToEmpty(cell(d, map.importance)),
+      };
+      if (map.branch) row.branch = blankToEmpty(cell(d, map.branch));
+      if (map.function) row.function = blankToEmpty(cell(d, map.function));
+      return row;
+    }
+
+    function isBlankRow(row) {
+      return !row.id && !row.name && !row.title && !row.parentId &&
+        !row.treePriority && !row.location && !row.importance &&
+        !row.branch && !row.function;
+    }
+
+    function tokenReason(raw, allowedSet, allowedList, fieldLabel) {
+      if (!raw) return "";
+      const bad = [];
+      raw.split("/").forEach((token) => {
+        const label = token.trim();
+        if (!label || !allowedSet.has(label)) bad.push(label || "(blank)");
+      });
+      if (!bad.length) return "";
+      const known = allowedList.length ? ": " + allowedList.join(", ") : "";
+      return fieldLabel + ' "' + raw + '" has ' + bad.map((part) => '"' + part + '"').join(", ") +
+        ", which must be a " + fieldLabel + "Keys value" + known + ".";
+    }
+
+    function distinctLabels(rows, field, allowedSet) {
+      const seen = new Set();
+      rows.forEach((row) => {
+        String(row[field] || "").split("/").forEach((token) => {
+          const label = token.trim();
+          if (label && allowedSet.has(label)) seen.add(label);
         });
+      });
+      return seen;
+    }
+
+    function colorCountReason(rows, field, keysName, colorName) {
+      const allowed = Object.values((window.ALIAS && window.ALIAS[keysName]) || {});
+      const seen = distinctLabels(rows, field, new Set(allowed));
+      const colorCount = Object.keys((window.ALIAS && window.ALIAS[colorName]) || {}).length;
+      if (colorCount >= seen.size) return "";
+      const plural = field === "branch"
+        ? (seen.size === 1 ? "branch" : "branches")
+        : (seen.size === 1 ? "function" : "functions");
+      const group = field === "branch" ? "branches" : "functions";
+      return colorName + " has " + colorCount + " color" + (colorCount === 1 ? "" : "s") +
+        " but the " + field + " column has " + seen.size + " distinct " + plural +
+        ". Need at least as many colors as " + group + ".";
+    }
+
+    function rowProblems(rows) {
+      const idCounts = new Map();
+      rows.forEach((row) => {
+        if (!row.id) return;
+        idCounts.set(row.id, (idCounts.get(row.id) || 0) + 1);
+      });
+
+      const ids = new Set(rows.filter((row) => row.id).map((row) => row.id));
+      const idsByName = new Map();
+      rows.forEach((row) => {
+        if (!row.id || !row.name) return;
+        if (!idsByName.has(row.name)) idsByName.set(row.name, []);
+        idsByName.get(row.name).push(row.id);
+      });
+
+      const allowedLocations = new Set(Object.values((window.ALIAS && window.ALIAS.locationKeys) || {}));
+      const knownLocations = Array.from(allowedLocations);
+      const allowedBranches = Object.values((window.ALIAS && window.ALIAS.branchKeys) || {});
+      const allowedBranchSet = new Set(allowedBranches);
+      const allowedFunctions = Object.values((window.ALIAS && window.ALIAS.functionKeys) || {});
+      const allowedFunctionSet = new Set(allowedFunctions);
+
+      return rows.map((row) => {
+        const reasons = [];
+        if (!row.id) reasons.push("id is blank.");
+        else if (idCounts.get(row.id) > 1) reasons.push('id "' + row.id + '" is used by more than one row.');
+
+        if (!row.location || !allowedLocations.has(row.location)) {
+          reasons.push(
+            'location "' + (row.location || "") + '" is not in locationKeys' +
+            (knownLocations.length ? ": " + knownLocations.join(", ") : "") + "."
+          );
+        }
+
+        if (columnMap.branch) {
+          const branchReason = tokenReason(row.branch, allowedBranchSet, allowedBranches, "branch");
+          if (branchReason) reasons.push(branchReason);
+        }
+        if (columnMap.function) {
+          const functionReason = tokenReason(row.function, allowedFunctionSet, allowedFunctions, "function");
+          if (functionReason) reasons.push(functionReason);
+        }
+
+        const parent = row.parentId.trim();
+        if (parent && !ids.has(parent)) {
+          const matches = idsByName.get(parent) || [];
+          if (matches.length > 1) {
+            reasons.push(
+              'parentId "' + parent + '" matches more than one person (' + matches.join(", ") +
+              "). Use that manager's id."
+            );
+          }
+        }
+
+        return reasons.length ? { line: row._line, id: row.id, name: row.name, reasons: reasons } : null;
+      }).filter(Boolean);
+    }
+
+    function exportRows(rows) {
+      return rows.map((row) => {
+        const copy = {
+          id: row.id,
+          name: row.name,
+          title: row.title,
+          parentId: row.parentId,
+          treePriority: row.treePriority,
+          location: row.location,
+          importance: row.importance,
+        };
+        if (columnMap.branch) copy.branch = row.branch || "";
+        if (columnMap.function) copy.function = row.function || "";
+        return copy;
+      });
+    }
+
+    function assessRecords() {
+      readyRows = null;
+      downloadBtn.disabled = true;
+
+      const rows = records
+        .map((record) => mapRecord(record, columnMap))
+        .filter((row) => !isBlankRow(row));
+      if (!rows.length) {
+        setMessage("The file has headers but no people rows. Please check the data.", true);
+        return;
+      }
+
+      const problems = rowProblems(rows);
+      if (problems.length) {
+        const noun = problems.length === 1 ? "row" : "rows";
+        setMessage(
+          problems.length + " " + noun + " cannot be used. Fix them in the CSV, or skip them and download the rest.",
+          true
+        );
+        showRowErrors(problems);
+        return;
+      }
+
+      if (columnMap.branch) {
+        const branchColors = colorCountReason(rows, "branch", "branchKeys", "branchColorKeys");
+        if (branchColors) {
+          setMessage(branchColors, true);
+          return;
+        }
+      }
+      if (columnMap.function) {
+        const functionColors = colorCountReason(rows, "function", "functionKeys", "functionColorKeys");
+        if (functionColors) {
+          setMessage(functionColors, true);
+          return;
+        }
+      }
+
+      const parentError = resolveParentNames(rows);
+      if (parentError) {
+        setMessage(parentError, true);
+        return;
+      }
+
+      readyRows = exportRows(rows);
+      downloadBtn.disabled = false;
+      const skippedNote = skippedTotal
+        ? "Skipped " + skippedTotal + " invalid " + (skippedTotal === 1 ? "row. " : "rows. ")
+        : "";
+      setMessage(
+        skippedNote + readyRows.length +
+          " people found. Ready — click Download data.js, then put that file next to index.html."
+      );
     }
 
     function readCsvText(text) {
       readyRows = null;
       downloadBtn.disabled = true;
+      records = [];
+      skippedTotal = 0;
       if (!columnMap) {
         setMessage("Choose alias.json before the CSV, or keep alias.json beside this page.", true);
         return;
@@ -349,8 +605,7 @@
       }
 
       const parsed = d3.csvParse(text);
-      const columns = parsed.columns || [];
-      const trimmed = columns.map((name) => String(name).trim());
+      const trimmed = (parsed.columns || []).map((name) => String(name).trim());
       const requiredHeaders = MAP_KEYS.slice();
       if (columnMap.branch) requiredHeaders.push("branch");
       if (columnMap.function) requiredHeaders.push("function");
@@ -363,108 +618,8 @@
         return;
       }
 
-      const rows = toRows(parsed, columnMap);
-      if (!rows.length) {
-        setMessage("The file has headers but no people rows. Please check the data.", true);
-        return;
-      }
-
-      const allowedLocations = new Set(Object.values((window.ALIAS && window.ALIAS.locationKeys) || {}));
-      const badLocation = rows.find((row) => !row.location || !allowedLocations.has(row.location));
-      if (badLocation) {
-        const known = Array.from(allowedLocations).join(", ");
-        setMessage(
-          'Person ' + badLocation.id + ' has location "' + (badLocation.location || "") +
-            '". Every person needs a location from alias.json locationKeys: ' + known + '.',
-          true
-        );
-        return;
-      }
-
-      if (columnMap.branch) {
-        const allowedBranches = Object.values((window.ALIAS && window.ALIAS.branchKeys) || {});
-        const allowedBranchSet = new Set(allowedBranches);
-        const seenBranches = new Set();
-        for (const row of rows) {
-          const raw = String(row.branch || "").trim();
-          if (!raw) continue;
-          const tokens = raw.split("/");
-          for (const token of tokens) {
-            const label = token.trim();
-            if (!label || !allowedBranchSet.has(label)) {
-              const known = allowedBranches.join(", ");
-              setMessage(
-                'Person ' + row.id + ' has branch "' + raw +
-                  '". Each part must be a branchKeys value' +
-                  (known ? ': ' + known : '') + '.',
-                true
-              );
-              return;
-            }
-            seenBranches.add(label);
-          }
-        }
-        const colorCount = Object.keys((window.ALIAS && window.ALIAS.branchColorKeys) || {}).length;
-        if (colorCount < seenBranches.size) {
-          setMessage(
-            "branchColorKeys has " + colorCount + " color" + (colorCount === 1 ? "" : "s") +
-              " but the branch column has " + seenBranches.size + " distinct branch" +
-              (seenBranches.size === 1 ? "" : "es") +
-              ". Need at least as many colors as branches.",
-            true
-          );
-          return;
-        }
-      }
-
-      if (columnMap.function) {
-        const allowedFunctions = Object.values((window.ALIAS && window.ALIAS.functionKeys) || {});
-        const allowedFunctionSet = new Set(allowedFunctions);
-        const seenFunctions = new Set();
-        for (const row of rows) {
-          const raw = String(row.function || "").trim();
-          if (!raw) continue;
-          const tokens = raw.split("/");
-          for (const token of tokens) {
-            const label = token.trim();
-            if (!label || !allowedFunctionSet.has(label)) {
-              const known = allowedFunctions.join(", ");
-              setMessage(
-                'Person ' + row.id + ' has function "' + raw +
-                  '". Each part must be a functionKeys value' +
-                  (known ? ': ' + known : '') + '.',
-                true
-              );
-              return;
-            }
-            seenFunctions.add(label);
-          }
-        }
-        const colorCount = Object.keys((window.ALIAS && window.ALIAS.functionColorKeys) || {}).length;
-        if (colorCount < seenFunctions.size) {
-          setMessage(
-            "functionColorKeys has " + colorCount + " color" + (colorCount === 1 ? "" : "s") +
-              " but the function column has " + seenFunctions.size + " distinct function" +
-              (seenFunctions.size === 1 ? "" : "s") +
-              ". Need at least as many colors as functions.",
-            true
-          );
-          return;
-        }
-      }
-
-      const parentError = resolveParentNames(rows);
-      if (parentError) {
-        setMessage(parentError, true);
-        return;
-      }
-
-      readyRows = rows;
-      downloadBtn.disabled = false;
-      setMessage(
-        rows.length +
-          " people found. Ready — click Download data.js, then put that file next to index.html."
-      );
+      records = parsed.map((data, index) => ({ line: index + 2, data: data }));
+      assessRecords();
     }
 
     mapInput.addEventListener("change", async (event) => {
@@ -478,20 +633,34 @@
         setMapStatus("That mapping file is not valid JSON.", true);
       }
       readyRows = null;
+      records = [];
+      skippedTotal = 0;
       downloadBtn.disabled = true;
       setMessage("Mapping updated. Choose the CSV again.");
+    });
+
+    skipBtn.addEventListener("click", () => {
+      const drop = new Set(
+        Array.from(rowErrorBody.querySelectorAll("tr")).map((tr) => Number(tr.firstChild.textContent))
+      );
+      if (!drop.size) return;
+      skippedTotal += drop.size;
+      records = records.filter((record) => !drop.has(record.line));
+      assessRecords();
     });
 
     csvInput.addEventListener("change", async (event) => {
       const file = event.target.files && event.target.files[0];
       sourceFileName = "";
       if (!file) {
+        records = [];
+        skippedTotal = 0;
         setMessage("No file selected yet.");
         return;
       }
       try {
+        sourceFileName = file.name;
         readCsvText(await file.text());
-        if (readyRows) sourceFileName = file.name;
       } catch (err) {
         setMessage("Could not read that file. Try saving it again as CSV (UTF-8).", true);
       }

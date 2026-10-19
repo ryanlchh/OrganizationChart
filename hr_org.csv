@@ -15,6 +15,7 @@ id,name,title,parentId,tree_priority,location,importance,branch,function
 106,Employee 106,Specialist / Manager,APAC Director 100,,HK,,HK2/UK1,
 107,Employee 107,Specialist / Manager,APAC Director 100,,Mainland China,,,
 108,Employee 108,Specialist / Manager,APAC Director 100,,India,,,Business
+9999,Invalid row1,,,,,,,
 109,Employee 109,Specialist / Manager,APAC Director 100,,HK,,,Transformation
 110,Employee 110,Specialist / Manager,APAC Director 100,,Mainland China,,,Tech
 111,Employee 111,Specialist / Manager,APAC Director 100,,India,,,Transformation
@@ -62,6 +63,7 @@ id,name,title,parentId,tree_priority,location,importance,branch,function
 153,Employee 153,Specialist / Manager,APAC Director 131,,India,,,Transformation
 154,Employee 154,Specialist / Manager,APAC Director 131,,HK,,,Business
 155,Employee 155,Specialist / Manager,APAC Director 131,,Mainland China,,HK1,Transformation
+9800,Invalid header1,,,,US,,,undefined
 156,Employee 156,Specialist / Manager,APAC Director 131,,India,,,Transformation
 157,Employee 157,Specialist / Manager,APAC Director 131,,HK,,UK1,Transformation
 158,Employee 158,Specialist / Manager,APAC Director 131,,Mainland China,,,Business/Transformation
@@ -152,6 +154,7 @@ id,name,title,parentId,tree_priority,location,importance,branch,function
 243,Employee 243,Specialist / Manager,Director 224,,US,,,Business
 244,Employee 244,Specialist / Manager,Director 224,,Mainland China,,,Tech
 245,Employee 245,Specialist / Manager,Director 224,,HK,,HK1/HK2/UK1,Business/Transformation
+9901,Invalid row21,,,,UK1,,,
 246,Employee 246,Specialist / Manager,Director 224,,UK,,,Business
 247,Employee 247,Specialist / Manager,Director 224,,US,,,Tech
 248,Employee 248,Specialist / Manager,Director 224,,Mainland China,,UK1,Tech

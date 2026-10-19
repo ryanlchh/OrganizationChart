@@ -1,0 +1,12 @@
+id,name,title,parentId,tree_priority,location,importance,branch,function
+1,Sarah Jenkins,Chief Executive Officer,,1,HK,Y,,Business
+2,Alex Rivera,Chief Technology Officer,Sarah Jenkins,0,Mars,Y,Nope,Nope
+3,Alex Rivera,Other,,0,UK,Y,HK1,Tech
+,No Id,Role,,0,HK,Y,HK1,Business
+4,Kid,Analyst,Alex Rivera,0,HK,Y,HK1,Business
+5,Dup,Analyst,1,0,HK,Y,HK1,Business
+5,Dup Two,Analyst,1,0,India,Y,HK2/UK1,Tech/Business
+9999,Invalid row1,,,,,,,
+9800,Invalid header1,,,,US,,,undefined
+9901,Invalid row21,,,,UK1,,,
+6,Bad Branch,Analyst,1,0,Poland,,HK1/Nope,Business

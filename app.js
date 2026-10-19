@@ -55,8 +55,14 @@
   let chart = null;
   let rawData = [];
   let functionMark = FUNCTION_MARK_DEFAULT;
+  let pendingLoad = null;
 
   const statusEl = document.getElementById("status");
+  const statusText = document.getElementById("statusText");
+  const rowErrors = document.getElementById("rowErrors");
+  const rowErrorBody = document.getElementById("rowErrorBody");
+  const skipRowsBtn = document.getElementById("skipRowsBtn");
+  const cancelRowsBtn = document.getElementById("cancelRowsBtn");
   const directorSelect = document.getElementById("directorSelect");
   const functionMarkSelect = document.getElementById("functionMark");
   const resetBtn = document.getElementById("resetBtn");
@@ -66,15 +72,43 @@
   const personSearch = document.getElementById("personSearch");
   const searchResults = document.getElementById("searchResults");
 
+  function hideRowPrompt() {
+    if (!rowErrors) return;
+    rowErrors.hidden = true;
+    rowErrorBody.replaceChildren();
+    statusEl.classList.remove("has-table");
+  }
+
   function showStatus(message, isError = false) {
-    statusEl.textContent = message;
+    hideRowPrompt();
+    pendingLoad = null;
+    statusText.textContent = message;
     statusEl.classList.toggle("error", isError);
     statusEl.classList.add("visible");
   }
 
   function hideStatus() {
+    hideRowPrompt();
+    pendingLoad = null;
     statusEl.classList.remove("visible", "error");
-    statusEl.textContent = "";
+    statusText.textContent = "";
+  }
+
+  function showRowPrompt(problems) {
+    statusText.textContent = problems.length + (problems.length === 1 ? " row" : " rows") +
+      " cannot be used. Continue to load the chart without them, or cancel.";
+    rowErrorBody.replaceChildren();
+    problems.forEach((problem) => {
+      const tr = document.createElement("tr");
+      [String(problem.line), problem.id || "(blank)", problem.name || "(blank)", problem.reasons.join("; ")].forEach((text) => {
+        const td = document.createElement("td");
+        td.textContent = text;
+        tr.appendChild(td);
+      });
+      rowErrorBody.appendChild(tr);
+    });
+    rowErrors.hidden = false;
+    statusEl.classList.add("visible", "error", "has-table");
   }
 
   function setSourceName(name) {
@@ -125,6 +159,173 @@
       }
     }
     return "";
+  }
+
+  function activeColumnMap() {
+    const source = (window.ALIAS && window.ALIAS.columnKeys) || {};
+    const map = {};
+    ["id", "name", "title", "parentId", "treePriority", "location", "importance"].forEach((key) => {
+      map[key] = String(source[key] == null ? "" : source[key]).trim();
+    });
+    if (String(source.branch || "").trim()) map.branch = String(source.branch).trim();
+    if (String(source.function || "").trim()) map.function = String(source.function).trim();
+    return map;
+  }
+
+  function csvCell(row, header) {
+    if (!header) return "";
+    if (Object.prototype.hasOwnProperty.call(row, header)) return row[header];
+    const key = Object.keys(row).find((name) => String(name).trim() === header);
+    return key ? row[key] : "";
+  }
+
+  function blankToEmpty(value) {
+    const text = String(value || "").trim();
+    return text.toLowerCase() === "null" ? "" : text;
+  }
+
+  function mapCsvRecord(record, map) {
+    const data = record.data;
+    const row = {
+      _line: record.line,
+      id: String(csvCell(data, map.id) || "").trim(),
+      name: String(csvCell(data, map.name) || "").trim(),
+      title: String(csvCell(data, map.title) || "").trim(),
+      parentId: blankToEmpty(csvCell(data, map.parentId)),
+      treePriority: blankToEmpty(csvCell(data, map.treePriority)),
+      location: blankToEmpty(csvCell(data, map.location)),
+      importance: blankToEmpty(csvCell(data, map.importance)),
+    };
+    if (map.branch) row.branch = blankToEmpty(csvCell(data, map.branch));
+    if (map.function) row.function = blankToEmpty(csvCell(data, map.function));
+    return row;
+  }
+
+  function isBlankPerson(row) {
+    return !row.id && !row.name && !row.title && !row.parentId &&
+      !row.treePriority && !row.location && !row.importance &&
+      !row.branch && !row.function;
+  }
+
+  function tokenReason(raw, allowedSet, allowedList, fieldLabel) {
+    if (!raw) return "";
+    const bad = [];
+    raw.split("/").forEach((token) => {
+      const label = token.trim();
+      if (!label || !allowedSet.has(label)) bad.push(label || "(blank)");
+    });
+    if (!bad.length) return "";
+    const known = allowedList.length ? ": " + allowedList.join(", ") : "";
+    return fieldLabel + ' "' + raw + '" has ' + bad.map((part) => '"' + part + '"').join(", ") +
+      ", which must be a " + fieldLabel + "Keys value" + known + ".";
+  }
+
+  function distinctLabels(rows, field, allowedSet) {
+    const seen = new Set();
+    rows.forEach((row) => {
+      String(row[field] || "").split("/").forEach((token) => {
+        const label = token.trim();
+        if (label && allowedSet.has(label)) seen.add(label);
+      });
+    });
+    return seen;
+  }
+
+  function colorCountReason(rows, field, keysName, colorName) {
+    const allowed = Object.values((window.ALIAS && window.ALIAS[keysName]) || {});
+    const seen = distinctLabels(rows, field, new Set(allowed));
+    const colorCount = Object.keys((window.ALIAS && window.ALIAS[colorName]) || {}).length;
+    if (colorCount >= seen.size) return "";
+    const plural = field === "branch"
+      ? (seen.size === 1 ? "branch" : "branches")
+      : (seen.size === 1 ? "function" : "functions");
+    const group = field === "branch" ? "branches" : "functions";
+    return colorName + " has " + colorCount + " color" + (colorCount === 1 ? "" : "s") +
+      " but the " + field + " column has " + seen.size + " distinct " + plural +
+      ". Need at least as many colors as " + group + ".";
+  }
+
+  function rowProblems(rows, map) {
+    const idCounts = new Map();
+    rows.forEach((row) => {
+      if (!row.id) return;
+      idCounts.set(row.id, (idCounts.get(row.id) || 0) + 1);
+    });
+    const ids = new Set(rows.filter((row) => row.id).map((row) => row.id));
+    const idsByName = new Map();
+    rows.forEach((row) => {
+      if (!row.id || !row.name) return;
+      if (!idsByName.has(row.name)) idsByName.set(row.name, []);
+      idsByName.get(row.name).push(row.id);
+    });
+    const allowedLocations = new Set(Object.values((window.ALIAS && window.ALIAS.locationKeys) || {}));
+    const knownLocations = Array.from(allowedLocations);
+    const allowedBranches = Object.values((window.ALIAS && window.ALIAS.branchKeys) || {});
+    const allowedFunctions = Object.values((window.ALIAS && window.ALIAS.functionKeys) || {});
+
+    return rows.map((row) => {
+      const reasons = [];
+      if (!row.id) reasons.push("id is blank.");
+      else if (idCounts.get(row.id) > 1) reasons.push('id "' + row.id + '" is used by more than one row.');
+      if (!row.location || !allowedLocations.has(row.location)) {
+        reasons.push(
+          'location "' + (row.location || "") + '" is not in locationKeys' +
+          (knownLocations.length ? ": " + knownLocations.join(", ") : "") + "."
+        );
+      }
+      if (map.branch) {
+        const branchReason = tokenReason(row.branch, new Set(allowedBranches), allowedBranches, "branch");
+        if (branchReason) reasons.push(branchReason);
+      }
+      if (map.function) {
+        const functionReason = tokenReason(row.function, new Set(allowedFunctions), allowedFunctions, "function");
+        if (functionReason) reasons.push(functionReason);
+      }
+      const parent = row.parentId.trim();
+      if (parent && !ids.has(parent)) {
+        const matches = idsByName.get(parent) || [];
+        if (matches.length > 1) {
+          reasons.push(
+            'parentId "' + parent + '" matches more than one person (' + matches.join(", ") +
+            "). Use that manager's id."
+          );
+        }
+      }
+      return reasons.length ? { line: row._line, id: row.id, name: row.name, reasons: reasons } : null;
+    }).filter(Boolean);
+  }
+
+  function chartRows(rows) {
+    return rows.map((row) => {
+      const copy = {
+        id: row.id,
+        name: row.name,
+        title: row.title,
+        parentId: row.parentId,
+        treePriority: row.treePriority,
+        location: row.location,
+        importance: row.importance,
+        branch: row.branch || "",
+        function: row.function || "",
+      };
+      return copy;
+    });
+  }
+
+  function finishCsvLoad(rows, sourceName, skipped) {
+    const people = chartRows(rows);
+    const parentError = resolveParentNames(people);
+    if (parentError) {
+      showStatus(parentError, true);
+      return;
+    }
+    setSourceName(sourceName);
+    buildChart(people, { keepStatus: true });
+    if (skipped) {
+      showStatus("Skipped " + skipped + " invalid " + (skipped === 1 ? "row. " : "rows. ") + people.length + " people loaded.");
+    } else {
+      hideStatus();
+    }
   }
 
   function priorityNumber(value) {
@@ -442,7 +643,7 @@
     });
   }
 
-  function buildChart(data) {
+  function buildChart(data, options) {
     rawData = normalizeRows(data).filter((row) => row.id !== FOREST_ID);
     if (!rawData.length) {
       showStatus("CSV has no usable rows (need id, name, title, parentId).", true);
@@ -455,7 +656,7 @@
     }
     const chartData = withForest(rawData);
 
-    hideStatus();
+    if (!options || !options.keepStatus) hideStatus();
     populateDirectorDropdown(rawData);
 
     document.getElementById("chart-container").innerHTML = "";
@@ -626,9 +827,53 @@
     chart.render().fit();
   }
 
-  async function loadCsvText(text) {
+  function loadCsvText(text, sourceName) {
+    pendingLoad = null;
+    hideRowPrompt();
+    if (!String(text || "").trim()) {
+      showStatus("That CSV is empty. Please check the file and try again.", true);
+      return;
+    }
+    const map = activeColumnMap();
     const parsed = d3.csvParse(text);
-    buildChart(parsed);
+    const trimmed = (parsed.columns || []).map((name) => String(name).trim());
+    const required = ["id", "name", "title", "parentId", "treePriority", "location", "importance"];
+    if (map.branch) required.push("branch");
+    if (map.function) required.push("function");
+    const missing = required.filter((key) => !map[key] || !trimmed.includes(map[key]));
+    if (missing.length) {
+      const detail = missing.map((key) => '"' + (map[key] || key) + '" (needed for ' + key + ")").join(", ");
+      showStatus("Missing column " + detail + ". Check alias.json columnKeys against this CSV.", true);
+      return;
+    }
+    const rows = parsed
+      .map((data, index) => mapCsvRecord({ line: index + 2, data: data }, map))
+      .filter((row) => !isBlankPerson(row));
+    if (!rows.length) {
+      showStatus("The file has headers but no people rows. Please check the data.", true);
+      return;
+    }
+    const problems = rowProblems(rows, map);
+    if (problems.length) {
+      pendingLoad = { rows: rows, map: map, sourceName: sourceName };
+      showRowPrompt(problems);
+      return;
+    }
+    if (map.branch) {
+      const branchColors = colorCountReason(rows, "branch", "branchKeys", "branchColorKeys");
+      if (branchColors) {
+        showStatus(branchColors, true);
+        return;
+      }
+    }
+    if (map.function) {
+      const functionColors = colorCountReason(rows, "function", "functionKeys", "functionColorKeys");
+      if (functionColors) {
+        showStatus(functionColors, true);
+        return;
+      }
+    }
+    finishCsvLoad(rows, sourceName, 0);
   }
 
   function aliasIsUsable(alias) {
@@ -662,8 +907,7 @@
       const response = await fetch(CSV_URL);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const text = await response.text();
-      setSourceName("hr_org.csv");
-      await loadCsvText(text);
+      loadCsvText(text, "hr_org.csv");
     } catch (err) {
       showStatus(
         "No bundled data found. Click Load CSV and choose hr_org.csv.",
@@ -724,16 +968,63 @@
 
   csvInput.addEventListener("change", async (e) => {
     const file = e.target.files && e.target.files[0];
+    e.target.value = "";
     if (!file) return;
     try {
-      const text = await file.text();
-      setSourceName(file.name);
-      await loadCsvText(text);
+      if (!aliasIsUsable(window.ALIAS)) await loadAlias();
+      loadCsvText(await file.text(), file.name);
     } catch (err) {
       showStatus("Failed to read the selected CSV file.", true);
       console.warn(err);
     }
   });
+
+  if (skipRowsBtn) {
+    skipRowsBtn.addEventListener("click", () => {
+      if (!pendingLoad) return;
+      const drop = new Set(
+        Array.from(rowErrorBody.querySelectorAll("tr")).map((tr) => Number(tr.firstChild.textContent))
+      );
+      const sourceName = pendingLoad.sourceName;
+      const map = pendingLoad.map;
+      const kept = pendingLoad.rows.filter((row) => !drop.has(row._line));
+      pendingLoad = null;
+      hideRowPrompt();
+      if (!kept.length) {
+        showStatus("No people left after skipping those rows.", true);
+        return;
+      }
+      const stillBad = rowProblems(kept, map);
+      if (stillBad.length) {
+        pendingLoad = { rows: kept, map: map, sourceName: sourceName };
+        showRowPrompt(stillBad);
+        return;
+      }
+      if (map.branch) {
+        const branchColors = colorCountReason(kept, "branch", "branchKeys", "branchColorKeys");
+        if (branchColors) {
+          showStatus(branchColors, true);
+          return;
+        }
+      }
+      if (map.function) {
+        const functionColors = colorCountReason(kept, "function", "functionKeys", "functionColorKeys");
+        if (functionColors) {
+          showStatus(functionColors, true);
+          return;
+        }
+      }
+      finishCsvLoad(kept, sourceName, drop.size);
+    });
+  }
+
+  if (cancelRowsBtn) {
+    cancelRowsBtn.addEventListener("click", () => {
+      pendingLoad = null;
+      hideRowPrompt();
+      showStatus("Load cancelled. The chart is unchanged.");
+    });
+  }
 
   tryFetchDefaultCsv();
 })();

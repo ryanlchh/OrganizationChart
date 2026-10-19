@@ -365,6 +365,69 @@
 
     #status.visible { display: block; }
     #status.error { border-color: #fca5a5; color: #991b1b; }
+    #status.has-table {
+      max-width: min(880px, calc(100vw - 24px));
+      text-align: left;
+    }
+
+    #status .table-wrap {
+      max-height: 240px;
+      margin-top: 10px;
+      overflow: auto;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+    }
+
+    #status table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    #status th,
+    #status td {
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid #fee2e2;
+      color: #334155;
+    }
+
+    #status th {
+      position: sticky;
+      top: 0;
+      background: #fef2f2;
+      color: #991b1b;
+      font-weight: 600;
+    }
+
+    #status .status-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    #status .status-actions button {
+      min-height: 32px;
+      border-radius: 6px;
+      font-size: 13px;
+      padding: 0 12px;
+      cursor: pointer;
+    }
+
+    #skipRowsBtn {
+      border: none;
+      background: var(--accent);
+      color: #fff;
+    }
+
+    #skipRowsBtn:hover { background: var(--accent-hover); }
+
+    #cancelRowsBtn {
+      border: 1px solid var(--accent);
+      background: #fff;
+      color: var(--accent);
+    }
 
     #chart-container {
       flex: 1 1 auto;
@@ -665,11 +728,32 @@
     <p class="tip">
       Open this page in your browser (double-click <code>index.html</code>).
       If the chart is empty, ask IT to check that <code>data.js</code> and the <code>packages</code> folder are next to this page.
-      The folder icon beside the file name loads a different CSV. Most users can ignore it.
+      The folder icon beside the file name loads a different CSV. If some rows are invalid, choose Continue to load the rest or Cancel to keep the current chart.
     </p>
   </aside>
 
-  <div id="status"></div>
+  <div id="status">
+    <div id="statusText"></div>
+    <div id="rowErrors" hidden>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Line</th>
+              <th>id</th>
+              <th>name</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody id="rowErrorBody"></tbody>
+        </table>
+      </div>
+      <div class="status-actions">
+        <button type="button" id="skipRowsBtn">Continue</button>
+        <button type="button" id="cancelRowsBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
   <div id="chart-container"></div>
   <footer id="site-footer">
     <div class="footer-meta">
