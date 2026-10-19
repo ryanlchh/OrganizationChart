@@ -238,6 +238,7 @@
       position: relative;
       z-index: 12;
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       gap: 8px;
       background: #fff;
@@ -277,6 +278,10 @@
       background: #fff;
       color: #0f172a;
       border: 1px solid #ccc;
+    }
+
+    #functionMark {
+      flex: 0 1 220px;
     }
 
     button, .file-btn {
@@ -630,10 +635,17 @@
   </header>
 
   <div id="jump-bar">
-    <label for="directorSelect">Jump to View:</label>
+    <label for="directorSelect">Current View:</label>
     <select id="directorSelect">
       <option value="">-- Select a Director / Branch --</option>
     </select>
+    <!--
+    <label for="functionMark">Function border:</label>
+    <select id="functionMark">
+      <option value="slice">Slice, 8px each</option>
+      <option value="stack">Stack, 4px each</option>
+    </select>
+    -->
   </div>
 
   <aside id="guidePanel" aria-label="How to use this chart">
@@ -646,7 +658,7 @@
     <ol>
       <li><strong>See the big picture</strong> — The map opens showing leadership down to directors. Drag to move around. Pinch or scroll to zoom.</li>
       <li><strong>Search</strong> — Use the search box in the header. Type a name or an ID, then press Enter or tap a result. The chart opens that person.</li>
-      <li><strong>Jump to a person</strong> — Use <em>Jump to View</em> just above the chart and pick a director or leader. The chart zooms to them and shows their team. Opening a director on the chart also selects them here.</li>
+      <li><strong>Current person</strong> — Use <em>Current View</em> just above the chart and pick a director or leader. The chart zooms to them and shows their team. Opening a director on the chart also selects them here.</li>
       <li><strong>Hide or show a team</strong> — Tap or click any card to fold or unfold the people underneath.</li>
       <li><strong>Go back to overview</strong> — Tap the reset icon in the header to return to the full leadership map.</li>
     </ol>

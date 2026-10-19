@@ -2,12 +2,63 @@
   const INITIAL_EXPAND_LEVEL = 2; // CEO(0) → VP(1) → Director(2)
   const FOREST_ID = "__all_trees__";
   const CSV_URL = "./hr_org.csv";
+  const BRANCH_OPACITY = 0.5;
+  const FUNCTION_OPACITY = 0.5;
+  const FUNCTION_MARK_DEFAULT = "stack"; // or "slice"
+  const SLICE_PX = 8;
+  const STACK_PX = 4;
+  const CARD_RADIUS = 8;
+  const FALLBACK_ALIAS = {
+    columnKeys: {
+      id: "id",
+      name: "name",
+      title: "title",
+      parentId: "parentId",
+      treePriority: "tree_priority",
+      location: "location",
+      importance: "importance",
+      branch: "branch",
+      function: "function",
+    },
+    locationKeys: {
+      hk: "HK",
+      in: "India",
+      cn: "Mainland China",
+      pl: "Poland",
+      gb: "UK",
+      us: "US",
+    },
+    branchKeys: {
+      branch1: "branch1",
+      branch2: "branch2",
+      branch3: "branch3",
+    },
+    branchColorKeys: {
+      color1: "#FF7F7F",
+      color2: "#98FB98",
+      color3: "#87CEFA",
+      color4: "#D8BFD8",
+    },
+    functionKeys: {
+      function1: "function1",
+      function2: "function2",
+      function3: "function3",
+    },
+    functionColorKeys: {
+      color1: "#C2410C",
+      color2: "#1D4ED8",
+      color3: "#15803D",
+      color4: "#7E22CE",
+    },
+  };
 
   let chart = null;
   let rawData = [];
+  let functionMark = FUNCTION_MARK_DEFAULT;
 
   const statusEl = document.getElementById("status");
   const directorSelect = document.getElementById("directorSelect");
+  const functionMarkSelect = document.getElementById("functionMark");
   const resetBtn = document.getElementById("resetBtn");
   const csvInput = document.getElementById("csvInput");
   const sourceNameEl = document.getElementById("sourceName");
@@ -189,8 +240,6 @@
     }[ch]));
   }
 
-  const COLOR_OPACITY = 0.5;
-
   function withOpacity(color, alpha) {
     const raw = String(color || "").trim();
     if (!raw) return raw;
@@ -222,7 +271,7 @@
     for (const token of tokens) {
       const index = branches.indexOf(token);
       if (index < 0 || !colors[index]) return "#fff";
-      picked.push(withOpacity(colors[index], COLOR_OPACITY));
+      picked.push(withOpacity(colors[index], BRANCH_OPACITY));
     }
     if (picked.length === 1) return picked[0];
     const stops = picked.map((color, index) => {
@@ -233,8 +282,9 @@
     return "linear-gradient(to right, " + stops.join(", ") + ")";
   }
 
-  const FUNCTION_BAR = 10;
-  const CARD_RADIUS = 8;
+  function functionLayerPx() {
+    return functionMark === "stack" ? STACK_PX : SLICE_PX;
+  }
 
   function functionColors(value) {
     const tokens = String(value || "")
@@ -248,7 +298,7 @@
     for (const token of tokens) {
       const index = names.indexOf(token);
       if (index < 0 || !colors[index]) return [];
-      picked.push(colors[index]);
+      picked.push(withOpacity(colors[index], FUNCTION_OPACITY));
     }
     return picked;
   }
@@ -275,8 +325,8 @@
     if (!el) return;
     const alias = window.ALIAS || {};
     const groups = [
-      legendPairs(alias.branchKeys, alias.branchColorKeys, COLOR_OPACITY),
-      legendPairs(alias.functionKeys, alias.functionColorKeys, 1),
+      legendPairs(alias.branchKeys, alias.branchColorKeys, BRANCH_OPACITY),
+      legendPairs(alias.functionKeys, alias.functionColorKeys, FUNCTION_OPACITY),
     ].filter((group) => group.length);
     el.innerHTML = groups
       .map((group) => {
@@ -289,16 +339,6 @@
         return `<div class="legend-col">${rows}</div>`;
       })
       .join("");
-  }
-
-  function functionBarFill(colors) {
-    if (colors.length <= 1) return colors[0] || "transparent";
-    const stops = colors.map((color, index) => {
-      const start = (100 * index) / colors.length;
-      const end = (100 * (index + 1)) / colors.length;
-      return color + " " + start + "% " + end + "%";
-    });
-    return "linear-gradient(to bottom, " + stops.join(", ") + ")";
   }
 
   function flagFile(location) {
@@ -336,25 +376,52 @@
           </div>
           <div style="font-size:11px;color:#64748b;margin-top:4px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(shortTitle)}</div>
         </div>`;
-    const bar = borderColors.length
-      ? `<div style="width:${FUNCTION_BAR}px;flex:0 0 ${FUNCTION_BAR}px;align-self:stretch;background:${functionBarFill(borderColors)};"></div>`
-      : "";
-    return `
+    if (!borderColors.length) {
+      return `
       <div style="
         width:${d.width}px;
         height:${d.height}px;
+        padding:8px 10px 8px 8px;
         background:${cardFill};
-        border:${borderColors.length ? "0" : "2px solid #cbd5e1"};
+        border:2px solid #cbd5e1;
         border-radius:${CARD_RADIUS}px;
         display:flex;
-        align-items:stretch;
-        overflow:hidden;
+        align-items:center;
+        gap:8px;
         box-sizing:border-box;
-      ">${bar}
-        <div style="min-width:0;flex:1 1 auto;display:flex;align-items:center;gap:8px;padding:8px 10px 8px 8px;">${body}
-        </div>
+      ">${body}
       </div>
     `;
+    }
+    const slice = functionLayerPx();
+    const total = slice * borderColors.length;
+    let html = `
+      <div style="
+        width:100%;
+        height:100%;
+        padding:8px 10px 8px 8px;
+        background:${cardFill};
+        border-radius:${Math.max(0, CARD_RADIUS - total)}px;
+        display:flex;
+        align-items:center;
+        gap:8px;
+        box-sizing:border-box;
+      ">${body}
+      </div>`;
+    for (let index = borderColors.length - 1; index >= 0; index -= 1) {
+      const outer = index === 0;
+      const radius = Math.max(0, CARD_RADIUS - slice * index);
+      html = `
+      <div style="
+        ${outer ? `width:${d.width}px;height:${d.height}px;` : "width:100%;height:100%;"}
+        padding:${slice}px;
+        background:${borderColors[index]};
+        border-radius:${radius}px;
+        box-sizing:border-box;
+      ">${html}
+      </div>`;
+    }
+    return html;
   }
 
   function sizeChartToContainer() {
@@ -564,50 +631,6 @@
     buildChart(parsed);
   }
 
-  const FALLBACK_ALIAS = {
-    columnKeys: {
-      id: "id",
-      name: "name",
-      title: "title",
-      parentId: "parentId",
-      treePriority: "tree_priority",
-      location: "location",
-      importance: "importance",
-      branch: "branch",
-      function: "function",
-    },
-    locationKeys: {
-      hk: "HK",
-      in: "India",
-      cn: "Mainland China",
-      pl: "Poland",
-      gb: "UK",
-      us: "US",
-    },
-    branchKeys: {
-      branch1: "branch1",
-      branch2: "branch2",
-      branch3: "branch3",
-    },
-    branchColorKeys: {
-      color1: "#FF7F7F",
-      color2: "#98FB98",
-      color3: "#87CEFA",
-      color4: "#D8BFD8",
-    },
-    functionKeys: {
-      function1: "function1",
-      function2: "function2",
-      function3: "function3",
-    },
-    functionColorKeys: {
-      color1: "#C2410C",
-      color2: "#1D4ED8",
-      color3: "#15803D",
-      color4: "#7E22CE",
-    },
-  };
-
   function aliasIsUsable(alias) {
     return Boolean(alias && alias.columnKeys && alias.locationKeys);
   }
@@ -679,6 +702,23 @@
     }
     jumpToView(id);
   });
+
+  if (functionMarkSelect) {
+    const sliceOption = functionMarkSelect.querySelector('option[value="slice"]');
+    const stackOption = functionMarkSelect.querySelector('option[value="stack"]');
+    if (sliceOption) sliceOption.textContent = "Slice, " + SLICE_PX + "px each";
+    if (stackOption) stackOption.textContent = "Stack, " + STACK_PX + "px each";
+    const savedMark = localStorage.getItem("orgFunctionMark");
+    if (savedMark === "stack" || savedMark === "slice") {
+      functionMark = savedMark;
+      functionMarkSelect.value = savedMark;
+    }
+    functionMarkSelect.addEventListener("change", () => {
+      functionMark = functionMarkSelect.value === "stack" ? "stack" : "slice";
+      localStorage.setItem("orgFunctionMark", functionMark);
+      if (chart) chart.render();
+    });
+  }
 
   resetBtn.addEventListener("click", resetFullView);
 
