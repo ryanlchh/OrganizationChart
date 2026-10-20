@@ -879,6 +879,28 @@
     URL.revokeObjectURL(url);
   }
 
+  function linkUpdate() {
+    d3.select(this)
+      .attr("fill", "none")
+      .attr("stroke", "lightGrey")
+      .attr("stroke-width", 2);
+  }
+
+  function applyChartLayout(instance, options) {
+    const buttons = options && options.buttons;
+    return instance
+      .nodeWidth((d) => (d.data.id === FOREST_ID ? 8 : 228))
+      .nodeHeight((d) => (d.data.id === FOREST_ID ? 8 : 72 + projectBandHeight()))
+      .nodeButtonWidth((d) => (buttons ? (d.data.id === FOREST_ID ? 0 : 40) : 0))
+      .nodeButtonHeight((d) => (buttons ? (d.data.id === FOREST_ID ? 0 : 40) : 0))
+      .childrenMargin(() => 40)
+      .compactMarginBetween(() => 24)
+      .compactMarginPair(() => 40)
+      .neighbourMargin(() => 28)
+      .linkUpdate(linkUpdate)
+      .nodeContent(nodeContent);
+  }
+
   async function exportMapHtml() {
     if (!chart || !rawData.length) return;
     const overlay = document.getElementById("chartBusy");
@@ -892,21 +914,15 @@
     document.body.appendChild(host);
     try {
       const exportData = withForest(rawData).map((row) => ({ ...row, _expanded: true }));
-      const exportChart = new d3.OrgChart()
-        .container("#export-chart")
-        .data(exportData)
-        .svgWidth(1600)
-        .svgHeight(900)
-        .nodeWidth((d) => (d.data.id === FOREST_ID ? 8 : 228))
-        .nodeHeight((d) => (d.data.id === FOREST_ID ? 8 : 72 + projectBandHeight()))
-        .nodeButtonWidth(() => 0)
-        .nodeButtonHeight(() => 0)
-        .childrenMargin(() => 40)
-        .compactMarginBetween(() => 24)
-        .compactMarginPair(() => 40)
-        .neighbourMargin(() => 28)
-        .duration(0)
-        .nodeContent(nodeContent);
+      const exportChart = applyChartLayout(
+        new d3.OrgChart()
+          .container("#export-chart")
+          .data(exportData)
+          .svgWidth(1600)
+          .svgHeight(900)
+          .duration(0),
+        { buttons: false }
+      );
       exportChart.render();
       const svg = host.querySelector("svg");
       if (!svg) return;
@@ -1124,32 +1140,15 @@
 
     document.getElementById("chart-container").innerHTML = "";
 
-    chart = new d3.OrgChart()
-      .container("#chart-container")
-      .data(chartData)
-      .nodeWidth((d) => (d.data.id === FOREST_ID ? 8 : 228))
-      .nodeHeight((d) => (d.data.id === FOREST_ID ? 8 : 72 + projectBandHeight()))
-      .nodeButtonWidth((d) => (d.data.id === FOREST_ID ? 0 : 40))
-      .nodeButtonHeight((d) => (d.data.id === FOREST_ID ? 0 : 40))
-      .childrenMargin(() => 40)
-      .compactMarginBetween(() => 24)
-      .compactMarginPair(() => 40)
-      .neighbourMargin(() => 28)
-      .linkUpdate(function (d) {
-        //const highlighted = d.data._upToTheRootHighlighted;
-        d3.select(this)
-          .attr("fill", "none")
-          .attr("stroke", "lightGrey")
-          .attr("stroke-width", 2)
-          //.attr("stroke", highlighted ? "#E27396" : "#4b5563")
-          //.attr("stroke-width", highlighted ? 5 : 2);
-        //if (highlighted) d3.select(this).raise();
-      })
-      .nodeContent(nodeContent)
-      .onExpandOrCollapse((node) => {
-        if (node.data.id === FOREST_ID) return;
-        syncJumpSelection(node);
-      });
+    chart = applyChartLayout(
+      new d3.OrgChart()
+        .container("#chart-container")
+        .data(chartData),
+      { buttons: true }
+    ).onExpandOrCollapse((node) => {
+      if (node.data.id === FOREST_ID) return;
+      syncJumpSelection(node);
+    });
 
     const originalButtonClick = chart.onButtonClick.bind(chart);
     chart.onButtonClick = (event, node) => {
