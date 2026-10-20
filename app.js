@@ -3,6 +3,7 @@
   const FOREST_ID = "__all_trees__";
   const CSV_URL = "./hr_org.csv";
   const LEGEND_PER_LINE = 9;
+  const LEGEND_COLOR_BLEND = { r: 255, g: 255, b: 255 };
   const FUNCTION_MARK_DEFAULT = "stack"; // or "slice"
   const FUNCTION_OPACITY = 0.5;
   const BRANCH_OPACITY = 0.5;
@@ -538,20 +539,43 @@
   function withOpacity(color, alpha) {
     const raw = String(color || "").trim();
     if (!raw) return raw;
+    if (!(alpha < 1)) return raw;
+    const rgb = parseCssRgb(raw);
+    if (!rgb) return raw;
+    const a = Math.max(0, Math.min(1, Number(alpha) || 0));
+    const r = Math.round(rgb.r * a + LEGEND_COLOR_BLEND.r * (1 - a));
+    const g = Math.round(rgb.g * a + LEGEND_COLOR_BLEND.g * (1 - a));
+    const b = Math.round(rgb.b * a + LEGEND_COLOR_BLEND.b * (1 - a));
+    return "rgb(" + r + ", " + g + ", " + b + ")";
+  }
+  function parseCssRgb(color) {
+    const raw = String(color || "").trim();
+    if (!raw) return null;
     const hex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(raw);
     if (hex) {
       let h = hex[1];
       if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
-      const r = parseInt(h.slice(0, 2), 16);
-      const g = parseInt(h.slice(2, 4), 16);
-      const b = parseInt(h.slice(4, 6), 16);
-      return "rgba(" + r + ", " + g + ", " + b + ", " + alpha + ")";
+      return {
+        r: parseInt(h.slice(0, 2), 16),
+        g: parseInt(h.slice(2, 4), 16),
+        b: parseInt(h.slice(4, 6), 16),
+      };
     }
-    const rgb = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*[\d.]+\s*)?\)$/i.exec(raw);
-    if (rgb) {
-      return "rgba(" + rgb[1] + ", " + rgb[2] + ", " + rgb[3] + ", " + alpha + ")";
+    const rgb = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i.exec(raw);
+    if (rgb) return { r: +rgb[1], g: +rgb[2], b: +rgb[3] };
+    if (!parseCssRgb._ctx) {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 1;
+      parseCssRgb._ctx = canvas.getContext("2d", { willReadFrequently: true });
     }
-    return raw;
+    const ctx = parseCssRgb._ctx;
+    ctx.clearRect(0, 0, 1, 1);
+    ctx.fillStyle = "#000";
+    ctx.fillStyle = raw;
+    ctx.fillRect(0, 0, 1, 1);
+    const data = ctx.getImageData(0, 0, 1, 1).data;
+    if (!data[3]) return null;
+    return { r: data[0], g: data[1], b: data[2] };
   }
 
   function splitTokens(value) {
@@ -1019,6 +1043,40 @@
     return `<div class="project-dots" aria-label="Projects">${dots}</div>`;
   }
 
+  function tipRow(label, value) {
+    if (!value) return "";
+    return (
+      `<div class="tip-row"><span class="tip-k">${esc(label)}</span>` +
+      `<span class="tip-v">${esc(value)}</span></div>`
+    );
+  }
+
+  function managerLabel(parentId) {
+    const id = String(parentId || "").trim();
+    if (!id || id === FOREST_ID) return "";
+    const manager = rawData.find((row) => row.id === id);
+    if (manager && manager.name) return manager.name;
+    return id;
+  }
+
+  function nodeTipHtml(row) {
+    const projects = projectColumns()
+      .filter((col) => String((row.projects && row.projects[col.key]) || "").trim().toUpperCase() === "Y")
+      .map((col) => col.header);
+    return (
+      `<div class="tip-name">${esc(row.name || "")}</div>` +
+      `<div class="tip-title">${esc(row.title || "")}</div>` +
+      tipRow("ID", row.id) +
+      tipRow("Reports to", managerLabel(row.parentId)) +
+      tipRow("Location", row.location) +
+      tipRow("Importance", row.importance) +
+      tipRow("Branch", row.branch) +
+      tipRow("Function", row.function) +
+      tipRow("Workstream", row.workstream) +
+      tipRow("Projects", projects.length ? projects.join(", ") : "")
+    );
+  }
+
   function nodeContent(d) {
     if (d.data.id === FOREST_ID) {
       return `<div style="width:${d.width}px;height:${d.height}px"></div>`;
@@ -1034,6 +1092,7 @@
     const flag = flagFile(d.data.location);
     const fill = cardFill(d.data.branch, d.data.workstream);
     const borderColors = functionColors(d.data.function);
+    const personAttr = ` class="org-card" data-person-id="${esc(d.data.id)}"`;
     const mark = important
       ? `<span title="Important" style="flex:0 0 auto;margin-right:4px;color:#7ec8e3;font-weight:700;line-height:1;">*</span>`
       : "";
@@ -1054,7 +1113,7 @@
         </div>`;
     if (!borderColors.length) {
       return `
-      <div style="
+      <div${personAttr} style="
         width:${d.width}px;
         height:${d.height}px;
         padding:8px 10px 8px 8px;
@@ -1089,7 +1148,7 @@
       const outer = index === 0;
       const radius = Math.max(0, CARD_RADIUS - slice * index);
       html = `
-      <div style="
+      <div${outer ? personAttr : ""} style="
         ${outer ? `width:${d.width}px;height:${d.height}px;` : "width:100%;height:100%;"}
         ${outer ? cardOpacity : ""}
         padding:${slice}px;
@@ -1460,6 +1519,71 @@
   }
 
   resetBtn.addEventListener("click", resetFullView);
+
+  const chartContainer = document.getElementById("chart-container");
+  const nodeTip = document.getElementById("nodeTip");
+  let tipPersonId = "";
+
+  function hideNodeTip() {
+    tipPersonId = "";
+    if (!nodeTip) return;
+    nodeTip.hidden = true;
+    nodeTip.innerHTML = "";
+  }
+
+  function placeNodeTip(clientX, clientY) {
+    if (!nodeTip || nodeTip.hidden) return;
+    const pad = 12;
+    const offset = 14;
+    nodeTip.style.left = "0px";
+    nodeTip.style.top = "0px";
+    const rect = nodeTip.getBoundingClientRect();
+    let left = clientX + offset;
+    let top = clientY + offset;
+    if (left + rect.width > window.innerWidth - pad) left = clientX - rect.width - offset;
+    if (top + rect.height > window.innerHeight - pad) top = clientY - rect.height - offset;
+    left = Math.max(pad, Math.min(left, window.innerWidth - rect.width - pad));
+    top = Math.max(pad, Math.min(top, window.innerHeight - rect.height - pad));
+    nodeTip.style.left = left + "px";
+    nodeTip.style.top = top + "px";
+  }
+
+  function showNodeTip(personId, clientX, clientY) {
+    if (!nodeTip || !personId) return;
+    if (tipPersonId !== personId) {
+      const row = rawData.find((item) => item.id === personId);
+      if (!row) {
+        hideNodeTip();
+        return;
+      }
+      tipPersonId = personId;
+      nodeTip.innerHTML = nodeTipHtml(row);
+      nodeTip.hidden = false;
+    }
+    placeNodeTip(clientX, clientY);
+  }
+
+  if (chartContainer && nodeTip) {
+    chartContainer.addEventListener("pointerover", (event) => {
+      const card = event.target.closest(".org-card");
+      if (!card || !chartContainer.contains(card)) return;
+      showNodeTip(card.getAttribute("data-person-id") || "", event.clientX, event.clientY);
+    });
+    chartContainer.addEventListener("pointermove", (event) => {
+      const card = event.target.closest(".org-card");
+      if (!card || !chartContainer.contains(card)) {
+        if (tipPersonId) hideNodeTip();
+        return;
+      }
+      showNodeTip(card.getAttribute("data-person-id") || "", event.clientX, event.clientY);
+    });
+    chartContainer.addEventListener("pointerout", (event) => {
+      const next = event.relatedTarget;
+      if (next && chartContainer.contains(next) && next.closest(".org-card")) return;
+      hideNodeTip();
+    });
+    chartContainer.addEventListener("pointerleave", hideNodeTip);
+  }
 
   const legendEl = document.getElementById("legend");
   if (legendEl) {

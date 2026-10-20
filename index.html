@@ -466,6 +466,52 @@
       max-height: 100%;
     }
 
+    .node-tip {
+      position: fixed;
+      z-index: 40;
+      max-width: min(320px, calc(100vw - 24px));
+      padding: 10px 12px;
+      background: #0f172a;
+      color: #f8fafc;
+      font-size: 12px;
+      line-height: 1.45;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.28);
+      pointer-events: none;
+    }
+
+    .node-tip[hidden] {
+      display: none;
+    }
+
+    .node-tip .tip-name {
+      font-weight: 700;
+      font-size: 13px;
+      margin-bottom: 2px;
+    }
+
+    .node-tip .tip-title {
+      color: #cbd5e1;
+      margin-bottom: 8px;
+    }
+
+    .node-tip .tip-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .node-tip .tip-k {
+      color: #94a3b8;
+      flex: 0 0 auto;
+      min-width: 5.5em;
+    }
+
+    .node-tip .tip-v {
+      color: #f1f5f9;
+      min-width: 0;
+      word-break: break-word;
+    }
+
     #site-footer {
       flex: 0 0 auto;
       position: relative;
@@ -656,6 +702,7 @@
       height: 8px;
       border-radius: 50%;
       flex: 0 0 auto;
+      background-color: #fff;
       box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
     }
 
@@ -974,6 +1021,7 @@
       <li><strong>Search</strong> — Use the search box in the header. Type a name or an ID, then press Enter or tap a result. The chart opens that person.</li>
       <li><strong>Current person</strong> — Use <em>Current View</em> just above the chart and pick a director or leader. The chart zooms to them and shows their team. Opening a director on the chart also selects them here.</li>
       <li><strong>Hide or show a team</strong> — Tap or click any card to fold or unfold the people underneath.</li>
+      <li><strong>Card details</strong> — Hover a person card to see the full name, role, ID, location, branch, function, workstream, and projects.</li>
       <li><strong>Go back to overview</strong> — Tap the reset icon in the header to return to the full leadership map.</li>
       <li><strong>Projects</strong> — Dots under the role follow the project list. A colored dot means that person is on the project. A light grey dot means they are not. The footer groups those colors under <em>project</em>.</li>
       <li><strong>Filter from the legend</strong> — Click a legend to fade people who do not match. Their card drops to a faint tint and the name turns grey. The reporting lines stay in place. Click the legend again to clear. Turn on <em>Multi-select</em> to keep several legends at once. A person matches if any selected legend applies. <em>Auto-expand</em> opens every matching person, and the managers above them, when you click a legend.</li>
@@ -1011,6 +1059,7 @@
   <div id="chart-stage">
     <div id="chart-container"></div>
     <div id="chartBusy" class="chart-busy" hidden>Updating chart…</div>
+    <div id="nodeTip" class="node-tip" hidden role="tooltip"></div>
   </div>
   <footer id="site-footer">
     <button type="button" class="icon-btn" id="helpBtn" title="Help Guide" aria-label="Help Guide">
